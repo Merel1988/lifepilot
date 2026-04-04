@@ -7,9 +7,10 @@ interface ItemCardProps {
   item: Item;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
+  onEdit: (item: Item) => void;
 }
 
-export default function ItemCard({ item, onToggle, onDelete }: ItemCardProps) {
+export default function ItemCard({ item, onToggle, onDelete, onEdit }: ItemCardProps) {
   const folderLabel = MAIN_FOLDERS.find((f) => f.id === item.folder)?.label ?? item.folder;
   const typeLabels: Record<string, string> = { TASK: "Taak", REMINDER: "Herinnering", NOTE: "Notitie" };
   const typeColors: Record<string, string> = {
@@ -27,10 +28,13 @@ export default function ItemCard({ item, onToggle, onDelete }: ItemCardProps) {
     : null;
 
   return (
-    <div className={`flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm transition-opacity ${completedToday ? "opacity-50" : ""}`}>
+    <div
+      className={`flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm transition-all hover:border-gray-200 cursor-pointer ${completedToday ? "opacity-50" : ""}`}
+      onClick={() => onEdit(item)}
+    >
       {item.type === "TASK" && (
         <button
-          onClick={() => onToggle(item.id, !completedToday)}
+          onClick={(e) => { e.stopPropagation(); onToggle(item.id, !completedToday); }}
           className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
             completedToday ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-400"
           }`}
@@ -82,7 +86,7 @@ export default function ItemCard({ item, onToggle, onDelete }: ItemCardProps) {
       </div>
 
       <button
-        onClick={() => onDelete(item.id)}
+        onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
         className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

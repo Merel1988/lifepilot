@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 
 const SYSTEM_PROMPT = `Je bent een persoonlijke weekmenu-assistent voor een Nederlandse moeder met een kind van 1,5 jaar. Hier zijn haar vaste regels:
@@ -54,6 +55,9 @@ OUTPUTFORMAAT - Geef ALLEEN geldige JSON terug, geen andere tekst, geen markdown
 Geef altijd precies 7 dagen terug: Maandag t/m Zondag.`;
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const body = await request.json();
   const { bonus, boerschappen, voorraad, vrijeDag } = body;
 

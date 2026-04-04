@@ -3,12 +3,23 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+interface AppShellProps {
+  children: React.ReactNode;
+  userName?: string | null;
+  userImage?: string | null;
+}
+
+export default function AppShell({ children, userName, userImage }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        userName={userName}
+        userImage={userImage}
+      />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile header */}

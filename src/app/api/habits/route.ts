@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const searchParams = request.nextUrl.searchParams;
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
@@ -30,6 +34,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const body = await request.json();
 
   const habit = await prisma.habit.create({

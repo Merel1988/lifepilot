@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get("q");
   const folder = searchParams.get("folder");
   const type = searchParams.get("type");
   const dateFrom = searchParams.get("dateFrom");
@@ -13,6 +18,9 @@ export async function GET(request: NextRequest) {
 
   const where: Record<string, unknown> = {};
 
+  if (query) {
+    where.title = { contains: query };
+  }
   if (folder) where.folder = folder;
   if (type) where.type = type;
   if (completed !== null && completed !== undefined && completed !== "") {
@@ -48,6 +56,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const body = await request.json();
 
   const item = await prisma.item.create({

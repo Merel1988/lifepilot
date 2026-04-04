@@ -1,9 +1,12 @@
+import { auth } from "@/auth";
 import AppShell from "@/components/AppShell";
 import HabitTracker from "@/components/HabitTracker";
 
-export default function HabitsPage() {
+export default async function HabitsPage() {
+  const session = await auth();
+
   return (
-    <AppShell>
+    <AppShell userName={session?.user?.name} userImage={session?.user?.image}>
       <HabitTracker />
     </AppShell>
   );

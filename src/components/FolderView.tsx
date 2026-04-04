@@ -6,6 +6,7 @@ import { MAIN_FOLDERS, TIME_FOLDERS, getTimeFolderForDate, type MainFolder, type
 import { type Item, isRecurringToday, getTodayDateString } from "@/lib/types";
 import ItemCard from "./ItemCard";
 import CreateItemModal from "./CreateItemModal";
+import EditItemModal from "./EditItemModal";
 
 interface FolderViewProps {
   folder: MainFolder;
@@ -17,6 +18,7 @@ export default function FolderView({ folder }: FolderViewProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editItem, setEditItem] = useState<Item | null>(null);
 
   const mainFolderLabel = MAIN_FOLDERS.find((f) => f.id === folder)?.label ?? folder;
   const subFolderLabel = TIME_FOLDERS.find((f) => f.id === sub)?.label ?? sub;
@@ -124,6 +126,7 @@ export default function FolderView({ folder }: FolderViewProps) {
               item={item}
               onToggle={handleToggle}
               onDelete={handleDelete}
+              onEdit={setEditItem}
             />
           ))}
         </div>
@@ -133,6 +136,12 @@ export default function FolderView({ folder }: FolderViewProps) {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreated={fetchItems}
+      />
+
+      <EditItemModal
+        item={editItem}
+        onClose={() => setEditItem(null)}
+        onUpdated={fetchItems}
       />
     </div>
   );

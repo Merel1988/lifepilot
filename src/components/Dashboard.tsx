@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { type Item, isRecurringToday, isCompletedForDate, getTodayDateString } from "@/lib/types";
 import ItemCard from "./ItemCard";
 import CreateItemModal from "./CreateItemModal";
+import EditItemModal from "./EditItemModal";
 
 interface Section {
   label: string;
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editItem, setEditItem] = useState<Item | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -194,6 +196,7 @@ export default function Dashboard() {
                     item={item}
                     onToggle={handleToggle}
                     onDelete={handleDelete}
+                    onEdit={setEditItem}
                   />
                 ))}
               </div>
@@ -206,6 +209,12 @@ export default function Dashboard() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreated={fetchItems}
+      />
+
+      <EditItemModal
+        item={editItem}
+        onClose={() => setEditItem(null)}
+        onUpdated={fetchItems}
       />
     </div>
   );

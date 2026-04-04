@@ -1,9 +1,12 @@
+import { auth } from "@/auth";
 import AppShell from "@/components/AppShell";
 import MealPlanner from "@/components/MealPlanner";
 
-export default function MealPlannerPage() {
+export default async function MealPlannerPage() {
+  const session = await auth();
+
   return (
-    <AppShell>
+    <AppShell userName={session?.user?.name} userImage={session?.user?.image}>
       <MealPlanner />
     </AppShell>
   );
