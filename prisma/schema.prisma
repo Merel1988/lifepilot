@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Item {
+  id             String                 @id @default(cuid())
+  title          String
+  description    String?
+  type           String                 @default("TASK") // TASK, REMINDER, NOTE
+  folder         String                 @default("PRIVE") // PRIVE, WERK, JANNIE_MEPPEL
+  date           DateTime?
+  time           String?                // HH:mm format for reminders
+  completed      Boolean                @default(false)
+  recurring      Boolean                @default(false)
+  recurrenceDays String?                // Comma-separated day numbers: 0=Sun,1=Mon,...,6=Sat e.g. "1,2,3,4"
+  completions    RecurrenceCompletion[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
+model RecurrenceCompletion {
+  id         String   @id @default(cuid())
+  itemId     String
+  item       Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  date       String   // ISO date string YYYY-MM-DD
+  createdAt  DateTime @default(now())
+
+  @@unique([itemId, date])
+}
+
+model Habit {
+  id          String            @id @default(cuid())
+  name        String
+  color       String            @default("#2563eb") // Tailwind blue-600
+  frequency   String            @default("DAILY") // DAILY, WEEKDAYS, CUSTOM
+  customDays  String?           // Comma-separated day numbers like recurrenceDays
+  archived    Boolean           @default(false)
+  completions HabitCompletion[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model HabitCompletion {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      String   // YYYY-MM-DD
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+}
+
+model MealPlan {
+  id        String   @id @default(cuid())
+  weekStart String   // YYYY-MM-DD of the monday
+  data      String   // JSON string of the full plan
+  createdAt DateTime @default(now())
+}
