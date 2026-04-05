@@ -4,6 +4,13 @@ export interface RecurrenceCompletion {
   date: string;
 }
 
+export interface AttachmentMeta {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface Item {
   id: string;
   title: string;
@@ -16,6 +23,7 @@ export interface Item {
   recurring: boolean;
   recurrenceDays: string | null;
   completions?: RecurrenceCompletion[];
+  attachments?: AttachmentMeta[];
 }
 
 const DAY_LABELS: Record<number, string> = {

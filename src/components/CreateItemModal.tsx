@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MAIN_FOLDERS, ITEM_TYPES, getDefaultFolder, type MainFolder, type ItemType } from "@/lib/folders";
+import RichTextEditor from "./RichTextEditor";
 
 const DAYS_OF_WEEK = [
   { id: 1, label: "Ma" },
@@ -31,6 +32,7 @@ export default function CreateItemModal({ open, onClose, onCreated }: CreateItem
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [attachments, setAttachments] = useState<{ id: string; filename: string; mimeType: string; size: number }[]>([]);
 
   function reset() {
     setTitle("");
@@ -42,6 +44,7 @@ export default function CreateItemModal({ open, onClose, onCreated }: CreateItem
     setRecurring(false);
     setRecurrenceDays([]);
     setShowMore(false);
+    setAttachments([]);
   }
 
   function toggleDay(day: number) {
@@ -203,14 +206,31 @@ export default function CreateItemModal({ open, onClose, onCreated }: CreateItem
 
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Omschrijving</label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                    placeholder="Optionele omschrijving..."
+                  <RichTextEditor
+                    content={description}
+                    onChange={setDescription}
+                    placeholder="Omschrijving, checklist, notities..."
+                    onAttachmentUploaded={(att) => setAttachments((prev) => [...prev, att])}
                   />
                 </div>
+
+                {/* Attachment list */}
+                {attachments.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Bijlagen</label>
+                    <div className="space-y-1">
+                      {attachments.map((att) => (
+                        <div key={att.id} className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
+                          <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          <span className="truncate flex-1">{att.filename}</span>
+                          <span className="text-xs text-gray-400">{(att.size / 1024).toFixed(0)}KB</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

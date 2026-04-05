@@ -48,7 +48,10 @@ export async function GET(request: NextRequest) {
 
   const items = await prisma.item.findMany({
     where: conditions.length > 0 ? { OR: conditions } : where,
-    include: { completions: true },
+    include: {
+      completions: true,
+      attachments: { select: { id: true, filename: true, mimeType: true, size: true } },
+    },
     orderBy: [{ date: "asc" }, { createdAt: "desc" }],
   });
 

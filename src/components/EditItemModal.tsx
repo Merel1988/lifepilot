@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { MAIN_FOLDERS, ITEM_TYPES, type MainFolder, type ItemType } from "@/lib/folders";
 import { type Item } from "@/lib/types";
+import RichTextEditor from "./RichTextEditor";
 
 const DAYS_OF_WEEK = [
   { id: 1, label: "Ma" },
@@ -30,6 +31,7 @@ export default function EditItemModal({ item, onClose, onUpdated }: EditItemModa
   const [recurring, setRecurring] = useState(false);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
+  const [attachments, setAttachments] = useState<{ id: string; filename: string; mimeType: string; size: number }[]>([]);
 
   useEffect(() => {
     if (item) {
@@ -41,6 +43,7 @@ export default function EditItemModal({ item, onClose, onUpdated }: EditItemModa
       setDescription(item.description || "");
       setRecurring(item.recurring);
       setRecurrenceDays(item.recurrenceDays ? item.recurrenceDays.split(",").map(Number) : []);
+      setAttachments(item.attachments || []);
     }
   }, [item]);
 
@@ -199,14 +202,58 @@ export default function EditItemModal({ item, onClose, onUpdated }: EditItemModa
 
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Omschrijving</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                placeholder="Optionele omschrijving..."
+              <RichTextEditor
+                content={description}
+                onChange={setDescription}
+                placeholder="Omschrijving, checklist, notities..."
+                itemId={item?.id}
+                onAttachmentUploaded={(att) => setAttachments((prev) => [...prev, att])}
               />
             </div>
+
+            {/* Attachment list */}
+            {attachments.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Bijlagen</label>
+                <div className="space-y-1">
+                  {attachments.map((att) => (
+                    <div key={att.id} className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
+                      {att.mimeType.startsWith("image/") ? (
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                      )}
+                      <a
+                        href={`/api/attachments/${att.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="truncate flex-1 hover:text-blue-600 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {att.filename}
+                      </a>
+                      <span className="text-xs text-gray-400">{(att.size / 1024).toFixed(0)}KB</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await fetch(`/api/attachments/${att.id}`, { method: "DELETE" });
+                          setAttachments((prev) => prev.filter((a) => a.id !== att.id));
+                        }}
+                        className="text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-gray-100 p-4 flex gap-3">

@@ -74,9 +74,23 @@ export default function ItemCard({ item, onToggle, onDelete, onEdit }: ItemCardP
           {item.title}
         </p>
         {item.description && (
-          <p className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</p>
+          <div
+            className="text-xs text-gray-500 mt-0.5 line-clamp-2 [&_ul[data-type='taskList']]:flex [&_ul[data-type='taskList']]:gap-1 [&_ul[data-type='taskList']]:list-none [&_ul[data-type='taskList']]:p-0"
+            dangerouslySetInnerHTML={{
+              __html: item.description.replace(/<img[^>]*>/g, "").replace(/<h[23][^>]*>/g, "<strong>").replace(/<\/h[23]>/g, "</strong> "),
+            }}
+          />
         )}
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          {/* Attachment indicator */}
+          {item.attachments && item.attachments.length > 0 && (
+            <span className="text-xs text-gray-400 flex items-center gap-0.5">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {item.attachments.length}
+            </span>
+          )}
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColors[item.type] || "bg-gray-100 text-gray-600"}`}>
             {typeLabels[item.type] || item.type}
           </span>

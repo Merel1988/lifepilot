@@ -19,6 +19,7 @@ model Item {
   recurring      Boolean                @default(false)
   recurrenceDays String?                // Comma-separated day numbers: 0=Sun,1=Mon,...,6=Sat e.g. "1,2,3,4"
   completions    RecurrenceCompletion[]
+  attachments    Attachment[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 }
@@ -71,6 +72,17 @@ model Recipe {
   source      String?  // "manual" or mealPlan ID it came from
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  itemId    String?
+  item      Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int
+  data      Bytes    // File stored as binary in SQLite
+  createdAt DateTime @default(now())
 }
 
 model CalendarFeed {
