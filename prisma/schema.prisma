@@ -74,6 +74,12 @@ model Recipe {
   updatedAt   DateTime @updatedAt
 }
 
+model PantryItem {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+}
+
 model Attachment {
   id        String   @id @default(cuid())
   itemId    String?

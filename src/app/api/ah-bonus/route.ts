@@ -1,8 +1,17 @@
 import { requireAuth } from "@/lib/auth-guard";
 
-interface BonusProduct {
+interface AHProduct {
   title: string;
-  discount: string;
+  bonusMechanism: string | null;
+  currentPrice: number | null;
+  priceBeforeBonus: number | null;
+  promotionType: string | null;
+  mainCategory: string | null;
+}
+
+interface AHSearchResponse {
+  products: AHProduct[];
+  page: { totalPages: number };
 }
 
 export async function GET() {
@@ -10,98 +19,73 @@ export async function GET() {
   if (denied) return denied;
 
   try {
-    // Fetch AH bonus page segments via their public API
-    const res = await fetch("https://www.ah.nl/bonus", {
+    // Step 1: Get anonymous auth token
+    const tokenRes = await fetch("https://api.ah.nl/mobile-auth/v1/auth/token/anonymous", {
+      method: "POST",
       headers: {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml",
+        "Content-Type": "application/json",
+        "User-Agent": "Appie/8.22.3",
       },
+      body: JSON.stringify({ clientId: "appie" }),
     });
 
-    if (!res.ok) {
-      return Response.json({ products: [], error: "Kon AH bonus niet ophalen" });
+    if (!tokenRes.ok) {
+      return Response.json({ products: [], error: "Kon niet inloggen bij AH API" });
     }
 
-    const html = await res.text();
-    const products: BonusProduct[] = [];
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
 
-    // Parse product cards from the HTML
-    // AH uses data attributes and specific class patterns for bonus items
-    // Look for product title + discount patterns in the HTML
-    const productRegex = /<[^>]*data-testhook="product-title"[^>]*>([^<]+)<\/[^>]*>/g;
-    const discountRegex = /<[^>]*data-testhook="product-discount"[^>]*>([^<]+)<\/[^>]*>/g;
-
-    const titles: string[] = [];
-    const discounts: string[] = [];
-
-    let match;
-    while ((match = productRegex.exec(html)) !== null) {
-      titles.push(match[1].trim());
-    }
-    while ((match = discountRegex.exec(html)) !== null) {
-      discounts.push(match[1].trim());
+    if (!accessToken) {
+      return Response.json({ products: [], error: "Geen access token ontvangen" });
     }
 
-    // If data-testhook approach doesn't work, try a broader pattern
-    if (titles.length === 0) {
-      // Try to find JSON-LD or __NEXT_DATA__ with product info
-      const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>(.+?)<\/script>/);
-      if (nextDataMatch) {
-        try {
-          const nextData = JSON.parse(nextDataMatch[1]);
-          const props = nextData?.props?.pageProps;
+    // Step 2: Fetch bonus products (page 0, up to 1000)
+    const products: { title: string; discount: string; category: string }[] = [];
 
-          // Navigate the AH data structure to find bonus products
-          const segments = props?.bonusSegments || props?.segments || [];
-          for (const segment of segments) {
-            const items = segment?.products || segment?.items || [];
-            for (const item of items) {
-              const title = item?.title || item?.product?.title || item?.name;
-              const discount = item?.discount?.description || item?.shield?.text || item?.discountLabel || "";
-              if (title) {
-                products.push({ title, discount });
-              }
-            }
-          }
-
-          // Also check for a flat products array
-          if (products.length === 0 && props?.products) {
-            for (const item of props.products) {
-              if (item.title) {
-                products.push({
-                  title: item.title,
-                  discount: item.discount?.description || item.shield?.text || "",
-                });
-              }
-            }
-          }
-        } catch {
-          // JSON parse failed, continue with regex fallback
+    // Fetch first 2 pages (up to 2000 products, usually enough for weekly national deals)
+    for (let page = 0; page < 2; page++) {
+      const searchRes = await fetch(
+        `https://api.ah.nl/mobile-services/product/search/v2?filters=bonus%3Dtrue&size=1000&page=${page}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${accessToken}`,
+            "User-Agent": "Appie/8.22.3",
+            "x-application": "AHWEBSHOP",
+          },
         }
-      }
-    } else {
-      for (let i = 0; i < titles.length; i++) {
+      );
+
+      if (!searchRes.ok) break;
+
+      const data: AHSearchResponse = await searchRes.json();
+
+      for (const product of data.products) {
+        // Only include weekly national bonus deals, not permanent online deals
+        if (product.promotionType !== "NATIONAL") continue;
+
+        const discount = product.bonusMechanism || "";
+        const priceInfo = product.currentPrice
+          ? `€${product.currentPrice.toFixed(2)}`
+          : "";
+        const wasPrice = product.priceBeforeBonus
+          ? ` (was €${product.priceBeforeBonus.toFixed(2)})`
+          : "";
+
         products.push({
-          title: titles[i],
-          discount: discounts[i] || "",
+          title: product.title,
+          discount: [discount, priceInfo, wasPrice].filter(Boolean).join(" ").trim(),
+          category: product.mainCategory || "",
         });
       }
-    }
 
-    // Fallback: extract any visible bonus text patterns
-    if (products.length === 0) {
-      // Look for common AH bonus text patterns like "2 voor 3.00" or "1+1 gratis"
-      const bonusTextRegex = /(?:title|alt|aria-label)="([^"]*(?:korting|gratis|bonus|voor|stuks)[^"]*)"/gi;
-      while ((match = bonusTextRegex.exec(html)) !== null) {
-        const text = match[1].trim();
-        if (text.length > 5 && text.length < 200) {
-          products.push({ title: text, discount: "" });
-        }
-      }
+      // Stop if we've fetched all pages
+      if (page >= data.page.totalPages - 1) break;
     }
 
     return Response.json({
-      products: products.slice(0, 50), // Cap at 50 items
+      products,
+      count: products.length,
       fetchedAt: new Date().toISOString(),
     });
   } catch {

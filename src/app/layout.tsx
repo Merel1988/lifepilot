@@ -29,6 +29,8 @@ export default function RootLayout({
   return (
     <html lang="nl">
       <head>
+        <link rel="icon" href="/favicon.ico" sizes="32x32" />
+        <link rel="icon" href="/logo.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className="bg-gray-50 text-gray-900 antialiased">

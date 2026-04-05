@@ -54,8 +54,12 @@ function getDefaultMealGrid(): Record<string, Record<string, boolean>> {
   return grid;
 }
 
+interface PantryItem {
+  id: string;
+  name: string;
+}
+
 export default function MealPlanner() {
-  const [voorraad, setVoorraad] = useState("");
   const [persoonlijkeBonus, setPersoonlijkeBonus] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MealPlanResult | null>(null);
@@ -74,9 +78,37 @@ export default function MealPlanner() {
   // Favorite recipes
   const [recipes, setRecipes] = useState<Recipe[]>([]);
 
+  // Persistent pantry
+  const [pantry, setPantry] = useState<PantryItem[]>([]);
+  const [newPantryItem, setNewPantryItem] = useState("");
+  const [extraVoorraad, setExtraVoorraad] = useState("");
+
   useEffect(() => {
     fetch("/api/recipes").then((r) => r.json()).then(setRecipes).catch(() => {});
+    fetch("/api/pantry").then((r) => r.json()).then(setPantry).catch(() => {});
   }, []);
+
+  async function addPantryItems() {
+    const names = newPantryItem.split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+    if (names.length === 0) return;
+    const res = await fetch("/api/pantry", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names }),
+    });
+    const created = await res.json();
+    setPantry((prev) => [...created, ...prev]);
+    setNewPantryItem("");
+  }
+
+  async function removePantryItem(id: string) {
+    await fetch("/api/pantry", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setPantry((prev) => prev.filter((p) => p.id !== id));
+  }
 
   const toggleChecked = (i: number) => setChecked((prev) => ({ ...prev, [i]: !prev[i] }));
 
@@ -163,7 +195,10 @@ export default function MealPlanner() {
         body: JSON.stringify({
           ahBonus,
           persoonlijkeBonus,
-          voorraad,
+          voorraad: [
+            ...pantry.map((p) => p.name),
+            ...extraVoorraad.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
+          ].join(", "),
           mealGrid,
           photos: photoData,
           recipes: recipes.map((r) => ({
@@ -213,10 +248,11 @@ export default function MealPlanner() {
     setResult(null);
     setAhBonus("");
     setPersoonlijkeBonus("");
-    setVoorraad("");
+    setExtraVoorraad("");
     setError(null);
     setAhFetched(false);
     setPhotos([]);
+    // Pantry is NOT reset — it persists between sessions
   }
 
   // Count how many meals are selected
@@ -340,14 +376,54 @@ export default function MealPlanner() {
             />
           </div>
 
-          {/* What's in stock — photos + text */}
+          {/* Persistent pantry */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Wat heb je in huis?</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Maak foto&apos;s van je koelkast/voorraadkast, of typ wat je hebt
+              Je voorraadlijst wordt bewaard. Streep af wat op is, voeg toe wat erbij komt.
             </p>
 
-            {/* Photo upload */}
+            {/* Pantry items */}
+            {pantry.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {pantry.map((item) => (
+                  <span
+                    key={item.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-800 rounded-lg text-xs font-medium group"
+                  >
+                    {item.name}
+                    <button
+                      onClick={() => removePantryItem(item.id)}
+                      className="text-green-400 hover:text-red-500 transition-colors"
+                      title="Verwijderen (op)"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add pantry items */}
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                placeholder="Toevoegen: gehakt, courgette, tonijn..."
+                value={newPantryItem}
+                onChange={(e) => setNewPantryItem(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addPantryItems())}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-400 bg-gray-50"
+              />
+              <button
+                onClick={addPantryItems}
+                disabled={!newPantryItem.trim()}
+                className="px-3 py-2 bg-green-700 text-white rounded-lg text-sm font-medium hover:bg-green-800 disabled:opacity-50 transition-colors"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Photo upload for extra context */}
             <div className="mb-3">
               <input
                 ref={fileInputRef}
@@ -360,13 +436,13 @@ export default function MealPlanner() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-green-400 hover:text-green-700 transition-colors w-full justify-center"
+                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-200 rounded-xl text-xs text-gray-400 hover:border-green-400 hover:text-green-700 transition-colors w-full justify-center"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Foto toevoegen
+                Foto van koelkast/voorraadkast
               </button>
             </div>
 
@@ -391,12 +467,13 @@ export default function MealPlanner() {
               </div>
             )}
 
+            {/* Extra text for items not in pantry */}
             <textarea
-              placeholder="bijv. gehakt in vriezer, halve courgette, blik tonijn x2..."
-              value={voorraad}
-              onChange={(e) => setVoorraad(e.target.value)}
+              placeholder="Extra items of details (bijv. halve courgette, 2 blikken tonijn)..."
+              value={extraVoorraad}
+              onChange={(e) => setExtraVoorraad(e.target.value)}
               rows={2}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder-gray-400 text-sm resize-none bg-gray-50"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder-gray-400 text-xs resize-none bg-gray-50"
             />
           </div>
 
