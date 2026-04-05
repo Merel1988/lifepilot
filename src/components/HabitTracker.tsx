@@ -23,9 +23,8 @@ const COLORS = [
   "#0891b2", "#d946ef", "#ca8a04", "#4f46e5", "#059669",
 ];
 
-function getTodayStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+function getDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function getWeekDates(): string[] {
@@ -36,9 +35,7 @@ function getWeekDates(): string[] {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    dates.push(
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
-    );
+    dates.push(getDateStr(d));
   }
   return dates;
 }
@@ -52,6 +49,34 @@ function shouldShowHabitOnDay(habit: Habit, dayOfWeek: number): boolean {
   return true;
 }
 
+// Generate weeks for history (most recent first)
+function getWeeksBack(count: number): { label: string; dates: string[] }[] {
+  const weeks: { label: string; dates: string[] }[] = [];
+  const today = new Date();
+  const thisMonday = new Date(today);
+  thisMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+  for (let w = 0; w < count; w++) {
+    const monday = new Date(thisMonday);
+    monday.setDate(thisMonday.getDate() - w * 7);
+    const dates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(getDateStr(d));
+    }
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const label = w === 0
+      ? "Deze week"
+      : w === 1
+      ? "Vorige week"
+      : `${monday.getDate()} ${monday.toLocaleDateString("nl-NL", { month: "short" })} – ${sunday.getDate()} ${sunday.toLocaleDateString("nl-NL", { month: "short" })}`;
+    weeks.push({ label, dates });
+  }
+  return weeks;
+}
+
 const DAY_NAMES = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
 export default function HabitTracker() {
@@ -63,8 +88,15 @@ export default function HabitTracker() {
   const [newFrequency, setNewFrequency] = useState("DAILY");
   const [newCustomDays, setNewCustomDays] = useState<number[]>([]);
 
+  // Detail modal
+  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+  const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
+  const [editName, setEditName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [historyWeeks, setHistoryWeeks] = useState(8);
+
   const weekDates = getWeekDates();
-  const todayStr = getTodayStr();
+  const todayStr = getDateStr(new Date());
 
   const fetchHabits = useCallback(async () => {
     setLoading(true);
@@ -83,6 +115,36 @@ export default function HabitTracker() {
     fetchHabits();
   }, [fetchHabits]);
 
+  async function openDetail(habit: Habit) {
+    setSelectedHabit(habit);
+    setEditName(habit.name);
+
+    // Fetch full history (all completions, no date filter)
+    const res = await fetch("/api/habits?dateFrom=2020-01-01&dateTo=2099-12-31");
+    const allHabits: Habit[] = await res.json();
+    const full = allHabits.find((h) => h.id === habit.id);
+    setDetailHabit(full || habit);
+  }
+
+  function closeDetail() {
+    setSelectedHabit(null);
+    setDetailHabit(null);
+  }
+
+  async function saveHabitName() {
+    if (!selectedHabit || !editName.trim() || editName === selectedHabit.name) return;
+    setSavingName(true);
+    await fetch(`/api/habits/${selectedHabit.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editName }),
+    });
+    setSavingName(false);
+    fetchHabits();
+    setSelectedHabit({ ...selectedHabit, name: editName });
+    if (detailHabit) setDetailHabit({ ...detailHabit, name: editName });
+  }
+
   async function toggleCompletion(habitId: string, date: string) {
     await fetch(`/api/habits/${habitId}/complete`, {
       method: "POST",
@@ -90,6 +152,17 @@ export default function HabitTracker() {
       body: JSON.stringify({ date }),
     });
     fetchHabits();
+
+    // Also update detail if open
+    if (detailHabit && detailHabit.id === habitId) {
+      const alreadyDone = detailHabit.completions.some((c) => c.date === date);
+      setDetailHabit({
+        ...detailHabit,
+        completions: alreadyDone
+          ? detailHabit.completions.filter((c) => c.date !== date)
+          : [...detailHabit.completions, { id: "temp", habitId, date }],
+      });
+    }
   }
 
   async function createHabit() {
@@ -115,6 +188,7 @@ export default function HabitTracker() {
   async function deleteHabit(id: string) {
     await fetch(`/api/habits/${id}`, { method: "DELETE" });
     fetchHabits();
+    if (selectedHabit?.id === id) closeDetail();
   }
 
   function isCompletedOn(habit: Habit, date: string): boolean {
@@ -127,15 +201,12 @@ export default function HabitTracker() {
     for (let i = 0; i < 365; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dateStr = getDateStr(d);
       const dayOfWeek = d.getDay();
-
       if (!shouldShowHabitOnDay(habit, dayOfWeek)) continue;
-
       if (habit.completions.some((c) => c.date === dateStr)) {
         streak++;
       } else {
-        // Skip today if not completed yet
         if (i === 0) continue;
         break;
       }
@@ -143,8 +214,51 @@ export default function HabitTracker() {
     return streak;
   }
 
-  // For streaks we need more data — this is a simplified version using available data
-  const todayDayOfWeek = new Date().getDay();
+  // Week completion dot for a habit
+  function renderWeekDot(habit: Habit, date: string) {
+    const d = new Date(date + "T12:00:00");
+    const dayOfWeek = d.getDay();
+    const active = shouldShowHabitOnDay(habit, dayOfWeek);
+    const completed = isCompletedOn(habit, date);
+    const isToday = date === todayStr;
+    const isPast = date < todayStr;
+
+    if (!active) {
+      return <span className="w-3 h-0.5 rounded bg-gray-100" />;
+    }
+
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); toggleCompletion(habit.id, date); }}
+        className="flex items-center justify-center"
+      >
+        <span
+          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+            completed
+              ? ""
+              : isToday
+              ? "border-2 border-dashed"
+              : isPast
+              ? "bg-red-50"
+              : "bg-gray-50"
+          }`}
+          style={
+            completed
+              ? { backgroundColor: habit.color }
+              : isToday
+              ? { borderColor: habit.color + "80" }
+              : {}
+          }
+        >
+          {completed && (
+            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -155,25 +269,7 @@ export default function HabitTracker() {
         </div>
       </div>
 
-      {/* Week grid header */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="grid grid-cols-[1fr_repeat(7,40px)] gap-0 px-4 py-3 border-b border-gray-100 items-center">
-          <span className="text-xs font-medium text-gray-400"></span>
-          {weekDates.map((date, i) => {
-            const isToday = date === todayStr;
-            return (
-              <span
-                key={date}
-                className={`text-xs font-medium text-center ${
-                  isToday ? "text-blue-600" : "text-gray-400"
-                }`}
-              >
-                {DAY_NAMES[i]}
-              </span>
-            );
-          })}
-        </div>
-
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -186,80 +282,55 @@ export default function HabitTracker() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {habits.map((habit) => (
-              <div
-                key={habit.id}
-                className="grid grid-cols-[1fr_repeat(7,40px)] gap-0 px-4 py-3 items-center group"
-              >
-                <div className="flex items-center gap-2 min-w-0 pr-2">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: habit.color }}
-                  />
-                  <span className="text-sm font-medium text-gray-900 truncate">
-                    {habit.name}
-                  </span>
-                  <button
-                    onClick={() => deleteHabit(habit.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all flex-shrink-0 ml-auto"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+            {habits.map((habit) => {
+              const weekCompleted = weekDates.filter((d) => isCompletedOn(habit, d)).length;
+              const weekTotal = weekDates.filter((d) => {
+                const day = new Date(d + "T12:00:00").getDay();
+                return shouldShowHabitOnDay(habit, day);
+              }).length;
 
-                {weekDates.map((date, i) => {
-                  const d = new Date(date + "T12:00:00");
-                  const dayOfWeek = d.getDay();
-                  const active = shouldShowHabitOnDay(habit, dayOfWeek);
-                  const completed = isCompletedOn(habit, date);
-                  const isToday = date === todayStr;
-                  const isPast = date < todayStr;
-
-                  if (!active) {
-                    return (
-                      <div key={date} className="flex items-center justify-center">
-                        <span className="w-3 h-0.5 rounded bg-gray-100" />
-                      </div>
-                    );
-                  }
-
-                  return (
+              return (
+                <div
+                  key={habit.id}
+                  className="px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => openDetail(habit)}
+                >
+                  {/* Habit name row — always visible */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: habit.color }}
+                    />
+                    <span className="text-sm font-medium text-gray-900 truncate flex-1">
+                      {habit.name}
+                    </span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {weekCompleted}/{weekTotal}
+                    </span>
                     <button
-                      key={date}
-                      onClick={() => toggleCompletion(habit.id, date)}
-                      className="flex items-center justify-center"
+                      onClick={(e) => { e.stopPropagation(); deleteHabit(habit.id); }}
+                      className="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
                     >
-                      <span
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                          completed
-                            ? ""
-                            : isToday
-                            ? "border-2 border-dashed"
-                            : isPast
-                            ? "bg-gray-50"
-                            : "bg-gray-50"
-                        }`}
-                        style={
-                          completed
-                            ? { backgroundColor: habit.color }
-                            : isToday
-                            ? { borderColor: habit.color + "80" }
-                            : {}
-                        }
-                      >
-                        {completed && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </span>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
-                  );
-                })}
-              </div>
-            ))}
+                  </div>
+
+                  {/* Week dots row */}
+                  <div className="flex items-center gap-0">
+                    {weekDates.map((date, i) => (
+                      <div key={date} className="flex-1 flex flex-col items-center gap-0.5">
+                        <span className={`text-[10px] font-medium ${date === todayStr ? "text-blue-600" : "text-gray-300"}`}>
+                          {DAY_NAMES[i]}
+                        </span>
+                        {renderWeekDot(habit, date)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -286,7 +357,6 @@ export default function HabitTracker() {
               onKeyDown={(e) => e.key === "Enter" && createHabit()}
             />
 
-            {/* Color picker */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">Kleur:</span>
               <div className="flex gap-1.5">
@@ -303,7 +373,6 @@ export default function HabitTracker() {
               </div>
             </div>
 
-            {/* Frequency */}
             <div className="flex gap-2">
               {[
                 { id: "DAILY", label: "Dagelijks" },
@@ -359,10 +428,7 @@ export default function HabitTracker() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setShowCreate(false);
-                  setNewName("");
-                }}
+                onClick={() => { setShowCreate(false); setNewName(""); }}
                 className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
               >
                 Annuleren
@@ -378,6 +444,140 @@ export default function HabitTracker() {
           </div>
         )}
       </div>
+
+      {/* Habit detail modal */}
+      {selectedHabit && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeDetail(); }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: selectedHabit.color }}
+                  />
+                  <h2 className="text-lg font-semibold text-gray-900">Gewoonte</h2>
+                </div>
+                <button onClick={closeDetail} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">
+                  &times;
+                </button>
+              </div>
+
+              {/* Edit name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Naam</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveHabitName()}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {editName !== selectedHabit.name && (
+                    <button
+                      onClick={saveHabitName}
+                      disabled={savingName || !editName.trim()}
+                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingName ? "..." : "Opslaan"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats */}
+              {detailHabit && (
+                <div className="flex gap-4">
+                  <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{getStreak(detailHabit)}</p>
+                    <p className="text-xs text-gray-400">Huidige streak</p>
+                  </div>
+                  <div className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{detailHabit.completions.length}</p>
+                    <p className="text-xs text-gray-400">Totaal voltooid</p>
+                  </div>
+                </div>
+              )}
+
+              {/* History grid */}
+              {detailHabit && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Geschiedenis</h3>
+                  <div className="space-y-3">
+                    {getWeeksBack(historyWeeks).map((week) => (
+                      <div key={week.dates[0]}>
+                        <p className="text-xs text-gray-400 mb-1">{week.label}</p>
+                        <div className="flex gap-1">
+                          {week.dates.map((date, i) => {
+                            const d = new Date(date + "T12:00:00");
+                            const dayOfWeek = d.getDay();
+                            const active = shouldShowHabitOnDay(detailHabit, dayOfWeek);
+                            const completed = detailHabit.completions.some((c) => c.date === date);
+                            const isFuture = date > todayStr;
+
+                            return (
+                              <div key={date} className="flex-1 flex flex-col items-center gap-0.5">
+                                <span className="text-[10px] text-gray-300">{DAY_NAMES[i]}</span>
+                                {!active ? (
+                                  <span className="w-full h-6 flex items-center justify-center">
+                                    <span className="w-3 h-0.5 rounded bg-gray-100" />
+                                  </span>
+                                ) : isFuture ? (
+                                  <span className="w-full h-6 flex items-center justify-center">
+                                    <span className="w-6 h-6 rounded-md bg-gray-50" />
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => toggleCompletion(detailHabit.id, date)}
+                                    className="w-full h-6 flex items-center justify-center"
+                                  >
+                                    <span
+                                      className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                                        completed ? "" : "bg-red-50"
+                                      }`}
+                                      style={completed ? { backgroundColor: detailHabit.color } : {}}
+                                    >
+                                      {completed && (
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      )}
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setHistoryWeeks((w) => w + 8)}
+                    className="w-full mt-3 py-2 text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Meer laden...
+                  </button>
+                </div>
+              )}
+
+              {/* Delete */}
+              <button
+                onClick={() => deleteHabit(selectedHabit.id)}
+                className="w-full py-2.5 text-sm font-medium text-red-600 bg-red-50 rounded-xl hover:bg-red-100 transition-colors"
+              >
+                Gewoonte verwijderen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
