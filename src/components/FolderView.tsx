@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { MAIN_FOLDERS, TIME_FOLDERS, getTimeFolderForDate, type MainFolder, type TimeFolder } from "@/lib/folders";
-import { type Item, isRecurringToday, getTodayDateString } from "@/lib/types";
+import { type Item, isCompletedForDate, getTodayDateString, recurringMatchesTimeFolder } from "@/lib/types";
 import ItemCard from "./ItemCard";
 import CreateItemModal from "./CreateItemModal";
 import EditItemModal from "./EditItemModal";
@@ -19,6 +19,10 @@ export default function FolderView({ folder }: FolderViewProps) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(true);
+
+  const hasRecurringToggle = sub === "deze-week" || sub === "deze-maand" || sub === "dit-jaar";
 
   const mainFolderLabel = MAIN_FOLDERS.find((f) => f.id === folder)?.label ?? folder;
   const subFolderLabel = TIME_FOLDERS.find((f) => f.id === sub)?.label ?? sub;
@@ -30,9 +34,8 @@ export default function FolderView({ folder }: FolderViewProps) {
       const allItems: Item[] = await res.json();
 
       const filtered = allItems.filter((item) => {
-        // Recurring items show in "vandaag" if today is one of their days
-        if (item.recurring) {
-          return sub === "vandaag" && isRecurringToday(item);
+        if (item.recurring && item.recurrenceDays) {
+          return recurringMatchesTimeFolder(item, sub);
         }
         const itemDate = item.date ? new Date(item.date) : null;
         const timeFolder = getTimeFolderForDate(itemDate, item.type);
@@ -47,6 +50,12 @@ export default function FolderView({ folder }: FolderViewProps) {
 
   useEffect(() => {
     fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    const handler = () => fetchItems();
+    window.addEventListener("item-moved", handler);
+    return () => window.removeEventListener("item-moved", handler);
   }, [fetchItems]);
 
   async function handleToggle(id: string, completed: boolean) {
@@ -100,6 +109,20 @@ export default function FolderView({ folder }: FolderViewProps) {
         })}
       </div>
 
+      {hasRecurringToggle && (
+        <button
+          onClick={() => setShowRecurring(!showRecurring)}
+          className={`flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            showRecurring
+              ? "bg-purple-100 text-purple-700"
+              : "bg-gray-100 text-gray-400"
+          }`}
+        >
+          <span>↻</span>
+          Herhalend {showRecurring ? "aan" : "uit"}
+        </button>
+      )}
+
       <button
         onClick={() => setShowCreate(true)}
         className="w-full mb-6 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 font-medium text-sm"
@@ -110,27 +133,75 @@ export default function FolderView({ folder }: FolderViewProps) {
         Nieuw item
       </button>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-400">Geen items in {subFolderLabel.toLowerCase()}</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              onToggle={handleToggle}
-              onDelete={handleDelete}
-              onEdit={setEditItem}
-            />
-          ))}
-        </div>
-      )}
+      {(() => {
+        const todayStr = getTodayDateString();
+        const visibleItems = hasRecurringToggle && !showRecurring
+          ? items.filter((item) => !item.recurring)
+          : items;
+        const activeItems = visibleItems.filter((item) => {
+          if (item.recurring) return !isCompletedForDate(item, todayStr);
+          return !item.completed;
+        });
+        const completedItems = visibleItems.filter((item) => {
+          if (item.recurring) return isCompletedForDate(item, todayStr);
+          return item.completed;
+        });
+
+        return loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : activeItems.length === 0 && completedItems.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-400">Geen items in {subFolderLabel.toLowerCase()}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {activeItems.map((item) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+                onEdit={setEditItem}
+              />
+            ))}
+
+            {completedItems.length > 0 && (
+              <div className="pt-4">
+                <button
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-2"
+                >
+                  <svg
+                    className={`w-4 h-4 transition-transform ${showCompleted ? "rotate-90" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                  {completedItems.length} afgerond
+                </button>
+                {showCompleted && (
+                  <div className="space-y-2">
+                    {completedItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onToggle={handleToggle}
+                        onDelete={handleDelete}
+                        onEdit={setEditItem}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <CreateItemModal
         open={showCreate}

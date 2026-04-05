@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
+import ReminderChecker from "@/components/ReminderChecker";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body className="bg-gray-50 text-gray-900 antialiased">
         {children}
         <ServiceWorkerRegistration />
+        <ReminderChecker />
       </body>
     </html>
   );

@@ -16,6 +16,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
+  const [completedItems, setCompletedItems] = useState<Item[]>([]);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -110,6 +112,13 @@ export default function Dashboard() {
       }
 
       setSections(result);
+
+      // Fetch completed items for today
+      const completedRes = await fetch(
+        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`
+      );
+      const completedAll: Item[] = await completedRes.json();
+      setCompletedItems(completedAll.filter((i) => !i.recurring));
     } finally {
       setLoading(false);
     }
@@ -117,6 +126,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchItems();
+  }, [fetchItems]);
+
+  useEffect(() => {
+    const handler = () => fetchItems();
+    window.addEventListener("item-moved", handler);
+    return () => window.removeEventListener("item-moved", handler);
   }, [fetchItems]);
 
   async function handleToggle(id: string, completed: boolean) {
@@ -202,6 +217,39 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
+
+          {completedItems.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-3"
+              >
+                <svg
+                  className={`w-4 h-4 transition-transform ${showCompleted ? "rotate-90" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                {completedItems.length} afgerond vandaag
+              </button>
+              {showCompleted && (
+                <div className="space-y-2">
+                  {completedItems.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                      onEdit={setEditItem}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

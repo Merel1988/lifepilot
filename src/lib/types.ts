@@ -43,6 +43,39 @@ export function isCompletedForDate(item: Item, date: string): boolean {
   return item.completions?.some((c) => c.date === date) ?? false;
 }
 
+/**
+ * Check if a recurring item should appear in a given time folder.
+ * - vandaag: if today is a recurrence day
+ * - deze-week: if any recurrence day falls in the remaining days of this week (excluding today)
+ * - deze-maand / dit-jaar: always (weekly recurring items always occur within a month)
+ * - ooit / notities: never
+ */
+export function recurringMatchesTimeFolder(item: Item, timeFolder: string): boolean {
+  if (!item.recurring || !item.recurrenceDays) return false;
+  const days = item.recurrenceDays.split(",").map(Number);
+  const today = new Date().getDay();
+
+  switch (timeFolder) {
+    case "vandaag":
+      return days.includes(today);
+    case "deze-week": {
+      // Remaining days of the week after today (Sun=0 is end of week)
+      const endOfWeekDay = 6; // Saturday
+      for (let d = today + 1; d <= endOfWeekDay; d++) {
+        if (days.includes(d)) return true;
+      }
+      // Also check Sunday (0) if today isn't Sunday
+      if (today !== 0 && days.includes(0)) return true;
+      return false;
+    }
+    case "deze-maand":
+    case "dit-jaar":
+      return true; // A weekly recurring item will always occur
+    default:
+      return false;
+  }
+}
+
 export function getTodayDateString(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;

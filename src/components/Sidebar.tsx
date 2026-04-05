@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MAIN_FOLDERS, TIME_FOLDERS } from "@/lib/folders";
@@ -9,10 +10,12 @@ interface SidebarProps {
   onClose: () => void;
   userName?: string | null;
   userImage?: string | null;
+  onMoveItem?: (itemId: string, newFolder: string) => void;
 }
 
-export default function Sidebar({ open, onClose, userName, userImage }: SidebarProps) {
+export default function Sidebar({ open, onClose, userName, userImage, onMoveItem }: SidebarProps) {
   const pathname = usePathname();
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
 
   const folderIcons: Record<string, string> = {
     PRIVE: "🏠",
@@ -106,8 +109,34 @@ export default function Sidebar({ open, onClose, userName, userImage }: SidebarP
             </div>
 
             {MAIN_FOLDERS.map((mainFolder) => (
-              <div key={mainFolder.id}>
-                <h3 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <div
+                key={mainFolder.id}
+                onDragOver={(e) => {
+                  if (e.dataTransfer.types.includes("application/x-item-id")) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    setDropTarget(mainFolder.id);
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDropTarget(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropTarget(null);
+                  const itemId = e.dataTransfer.getData("application/x-item-id");
+                  const currentFolder = e.dataTransfer.getData("application/x-item-folder");
+                  if (itemId && currentFolder !== mainFolder.id && onMoveItem) {
+                    onMoveItem(itemId, mainFolder.id);
+                  }
+                }}
+                className={`rounded-lg transition-colors ${
+                  dropTarget === mainFolder.id ? "bg-blue-50 ring-2 ring-blue-300" : ""
+                }`}
+              >
+                <h3 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 pt-2">
                   {folderIcons[mainFolder.id]} {mainFolder.label}
                 </h3>
                 <div className="space-y-0.5">

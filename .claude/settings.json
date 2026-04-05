@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx next:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar"
+    ]
+  }
+}

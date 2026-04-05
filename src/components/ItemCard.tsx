@@ -29,6 +29,12 @@ export default function ItemCard({ item, onToggle, onDelete, onEdit }: ItemCardP
 
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("application/x-item-id", item.id);
+        e.dataTransfer.setData("application/x-item-folder", item.folder);
+        e.dataTransfer.effectAllowed = "move";
+      }}
       className={`flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm transition-all hover:border-gray-200 cursor-pointer ${completedToday ? "opacity-50" : ""}`}
       onClick={() => onEdit(item)}
     >
