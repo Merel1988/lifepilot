@@ -11,6 +11,17 @@ interface Section {
   items: Item[];
 }
 
+interface CalendarEvent {
+  uid: string;
+  summary: string;
+  location: string | null;
+  start: string;
+  end: string | null;
+  allDay: boolean;
+  feedName: string;
+  feedColor: string;
+}
+
 export default function Dashboard() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +29,7 @@ export default function Dashboard() {
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [completedItems, setCompletedItems] = useState<Item[]>([]);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -113,6 +125,25 @@ export default function Dashboard() {
 
       setSections(result);
 
+      // Fetch calendar events for today
+      try {
+        const folders = ["PRIVE", "WERK", "JANNIE_MEPPEL"];
+        const calEvents: CalendarEvent[] = [];
+        for (const f of folders) {
+          const calRes = await fetch(
+            `/api/calendar/${f}?from=${today.toISOString()}&to=${todayEnd.toISOString()}`
+          );
+          if (calRes.ok) {
+            const calData = await calRes.json();
+            calEvents.push(...(calData.events || []));
+          }
+        }
+        calEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        setCalendarEvents(calEvents);
+      } catch {
+        // Calendar fetch is optional
+      }
+
       // Fetch completed items for today
       const completedRes = await fetch(
         `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`
@@ -176,6 +207,35 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900">{greeting}!</h1>
         <p className="text-gray-500 mt-1 capitalize">{dateStr}</p>
       </div>
+
+      {/* Today's calendar events */}
+      {calendarEvents.length > 0 && (
+        <div className="mb-6 bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Agenda vandaag
+          </h2>
+          <div className="space-y-2">
+            {calendarEvents.map((event) => (
+              <div key={event.uid} className="flex items-center gap-3">
+                <span
+                  className="w-1 h-8 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: event.feedColor }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{event.summary}</p>
+                  <p className="text-xs text-gray-400">
+                    {event.allDay
+                      ? "Hele dag"
+                      : `${new Date(event.start).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}${event.end ? ` – ${new Date(event.end).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}` : ""}`}
+                    {event.location && ` · ${event.location}`}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-300 flex-shrink-0">{event.feedName}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={() => setShowCreate(true)}

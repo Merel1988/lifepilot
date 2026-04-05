@@ -1,153 +1,90 @@
 import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
+import { parseICS, filterEventsByDateRange } from "@/lib/ics-parser";
 
-const RRULE_DAYS: Record<number, string> = {
-  0: "SU",
-  1: "MO",
-  2: "TU",
-  3: "WE",
-  4: "TH",
-  5: "FR",
-  6: "SA",
-};
-
-function escapeICS(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
-}
-
-function formatDateICS(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}${m}${d}`;
-}
-
-function formatDateTimeICS(date: Date, time?: string | null): string {
-  const dateStr = formatDateICS(date);
-  if (time) {
-    const [hh, mm] = time.split(":");
-    return `${dateStr}T${hh}${mm}00`;
-  }
-  return `${dateStr}`;
-}
-
+/**
+ * GET /api/calendar/[folder]?from=ISO&to=ISO
+ * Fetches events from all enabled calendar feeds for the given folder/date range.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ folder: string }> }
 ) {
+  const denied = await requireAuth();
+  if (denied) return denied;
+
   const { folder } = await params;
+  const folderName = folder.toUpperCase();
 
-  // Auth via token parameter
-  const token = request.nextUrl.searchParams.get("token");
-  const expectedToken = process.env.CRON_SECRET;
-  if (!expectedToken || token !== expectedToken) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const fromParam = request.nextUrl.searchParams.get("from");
+  const toParam = request.nextUrl.searchParams.get("to");
 
-  // Strip .ics extension if present
-  const folderName = folder.replace(/\.ics$/, "").toUpperCase();
-  const validFolders = ["PRIVE", "WERK", "JANNIE_MEPPEL"];
-  if (!validFolders.includes(folderName)) {
-    return new Response("Not Found", { status: 404 });
-  }
+  // Default: today to 7 days from now
+  const now = new Date();
+  const from = fromParam ? new Date(fromParam) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const to = toParam ? new Date(toParam) : new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const folderLabels: Record<string, string> = {
-    PRIVE: "Privé",
-    WERK: "Werk",
-    JANNIE_MEPPEL: "Jannie Meppel",
-  };
-
-  const items = await prisma.item.findMany({
-    where: { folder: folderName },
-    orderBy: { date: "asc" },
+  const feeds = await prisma.calendarFeed.findMany({
+    where: { folder: folderName, enabled: true },
   });
 
-  const lines: string[] = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//LifePilot//NL",
-    `X-WR-CALNAME:LifePilot - ${folderLabels[folderName]}`,
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-  ];
-
-  for (const item of items) {
-    lines.push("BEGIN:VEVENT");
-    lines.push(`UID:${item.id}@lifepilot`);
-    lines.push(`SUMMARY:${escapeICS(item.title)}`);
-
-    if (item.description) {
-      lines.push(`DESCRIPTION:${escapeICS(item.description)}`);
-    }
-
-    // Category based on type
-    const typeLabels: Record<string, string> = { TASK: "Taak", REMINDER: "Herinnering", NOTE: "Notitie" };
-    lines.push(`CATEGORIES:${typeLabels[item.type] || item.type}`);
-
-    if (item.recurring && item.recurrenceDays) {
-      // Recurring item — use RRULE
-      const days = item.recurrenceDays.split(",").map(Number);
-      const rruleDays = days.map((d) => RRULE_DAYS[d]).filter(Boolean).join(",");
-      lines.push(`RRULE:FREQ=WEEKLY;BYDAY=${rruleDays}`);
-
-      // Use today as start date for recurring items without a fixed date
-      const startDate = item.date ? new Date(item.date) : new Date();
-      if (item.time) {
-        lines.push(`DTSTART:${formatDateTimeICS(startDate, item.time)}`);
-        // 1 hour duration for timed events
-        const endDate = new Date(startDate);
-        const [hh, mm] = item.time.split(":").map(Number);
-        endDate.setHours(hh + 1, mm);
-        lines.push(`DTEND:${formatDateTimeICS(endDate, `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`)}`);
-      } else {
-        lines.push(`DTSTART;VALUE=DATE:${formatDateICS(startDate)}`);
-        lines.push(`DTEND;VALUE=DATE:${formatDateICS(startDate)}`);
-      }
-    } else if (item.date) {
-      const date = new Date(item.date);
-      if (item.time) {
-        lines.push(`DTSTART:${formatDateTimeICS(date, item.time)}`);
-        const endDate = new Date(date);
-        const [hh, mm] = item.time.split(":").map(Number);
-        endDate.setHours(hh + 1, mm);
-        lines.push(`DTEND:${formatDateTimeICS(endDate, `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`)}`);
-      } else {
-        lines.push(`DTSTART;VALUE=DATE:${formatDateICS(date)}`);
-        lines.push(`DTEND;VALUE=DATE:${formatDateICS(date)}`);
-      }
-
-      // Add alarm for reminders
-      if (item.type === "REMINDER" && item.time) {
-        lines.push("BEGIN:VALARM");
-        lines.push("TRIGGER:PT0M");
-        lines.push("ACTION:DISPLAY");
-        lines.push(`DESCRIPTION:${escapeICS(item.title)}`);
-        lines.push("END:VALARM");
-      }
-    } else {
-      // No date — use createdAt as a reference
-      const created = new Date(item.createdAt);
-      lines.push(`DTSTART;VALUE=DATE:${formatDateICS(created)}`);
-      lines.push(`DTEND;VALUE=DATE:${formatDateICS(created)}`);
-    }
-
-    if (item.completed) {
-      lines.push("STATUS:COMPLETED");
-    }
-
-    lines.push(`DTSTAMP:${formatDateICS(new Date(item.updatedAt))}T000000Z`);
-    lines.push("END:VEVENT");
+  if (feeds.length === 0) {
+    return Response.json({ events: [], feeds: 0 });
   }
 
-  lines.push("END:VCALENDAR");
+  const allEvents: Array<{
+    uid: string;
+    summary: string;
+    description: string | null;
+    location: string | null;
+    start: string;
+    end: string | null;
+    allDay: boolean;
+    feedName: string;
+    feedColor: string;
+  }> = [];
 
-  const icsContent = lines.join("\r\n");
+  for (const feed of feeds) {
+    try {
+      // Normalize URL: webcal:// → https://
+      const fetchUrl = feed.url.replace(/^webcal:\/\//, "https://");
 
-  return new Response(icsContent, {
-    headers: {
-      "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": `inline; filename="${folderName}.ics"`,
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-    },
-  });
+      const res = await fetch(fetchUrl, {
+        headers: {
+          "User-Agent": "LifePilot/1.0",
+          "Accept": "text/calendar",
+        },
+        // Cache for 5 minutes to avoid hammering calendar servers
+        next: { revalidate: 300 },
+      });
+
+      if (!res.ok) continue;
+
+      const icsText = await res.text();
+      const events = parseICS(icsText);
+      const filtered = filterEventsByDateRange(events, from, to);
+
+      for (const event of filtered) {
+        allEvents.push({
+          uid: event.uid,
+          summary: event.summary,
+          description: event.description,
+          location: event.location,
+          start: event.start.toISOString(),
+          end: event.end?.toISOString() || null,
+          allDay: event.allDay,
+          feedName: feed.name,
+          feedColor: feed.color,
+        });
+      }
+    } catch {
+      // Skip failed feeds silently
+    }
+  }
+
+  // Sort by start date
+  allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+
+  return Response.json({ events: allEvents, feeds: feeds.length });
 }

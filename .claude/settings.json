@@ -1,10 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx eslint:*)"
     ],
     "additionalDirectories": [
-      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar"
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar",
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/recipes",
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar-feeds"
     ]
   }
 }
