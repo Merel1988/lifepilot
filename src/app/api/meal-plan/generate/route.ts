@@ -177,7 +177,7 @@ Plan ALLEEN de hierboven genoemde dag/maaltijd combinaties. Donderdag avondeten 
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 2000,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: contentBlocks }],
@@ -185,7 +185,12 @@ Plan ALLEEN de hierboven genoemde dag/maaltijd combinaties. Donderdag avondeten 
     });
 
     if (!response.ok) {
-      return Response.json({ error: `API fout: ${response.status}` }, { status: 502 });
+      const errBody = await response.text();
+      console.error("Anthropic API error:", response.status, errBody);
+      return Response.json(
+        { error: `API fout (${response.status}): ${errBody}` },
+        { status: 502 }
+      );
     }
 
     const data = await response.json();

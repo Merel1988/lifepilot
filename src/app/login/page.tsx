@@ -67,6 +67,26 @@ export default async function LoginPage() {
               Inloggen met Google
             </button>
           </form>
+
+          <form
+            action={async () => {
+              "use server";
+              await signIn("microsoft-entra-id", { redirectTo: "/" });
+            }}
+          >
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#0078d4] text-white rounded-xl hover:bg-[#106ebe] transition-colors font-medium text-sm"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 23 23" fill="currentColor">
+                <rect x="1" y="1" width="10" height="10" fill="#f25022" />
+                <rect x="12" y="1" width="10" height="10" fill="#7fba00" />
+                <rect x="1" y="12" width="10" height="10" fill="#00a4ef" />
+                <rect x="12" y="12" width="10" height="10" fill="#ffb900" />
+              </svg>
+              Inloggen met Microsoft
+            </button>
+          </form>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
