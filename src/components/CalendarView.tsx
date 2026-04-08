@@ -32,6 +32,8 @@ export default function CalendarView() {
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [showAddFeed, setShowAddFeed] = useState(false);
+  const [microsoftConnected, setMicrosoftConnected] = useState(false);
+  const [microsoftLoading, setMicrosoftLoading] = useState(false);
 
   // Add feed form
   const [newName, setNewName] = useState("");
@@ -43,6 +45,12 @@ export default function CalendarView() {
     try {
       const res = await fetch("/api/calendar-feeds", { cache: "no-store" });
       setFeeds(await res.json());
+      // Check Microsoft connection status
+      const msRes = await fetch("/api/microsoft/status", { cache: "no-store" });
+      if (msRes.ok) {
+        const msData = await msRes.json();
+        setMicrosoftConnected(msData.connected);
+      }
     } finally {
       setLoading(false);
     }
@@ -58,12 +66,30 @@ export default function CalendarView() {
       const folders = [...new Set(feeds.filter((f) => f.enabled).map((f) => f.folder))];
       const allEvents: CalendarEvent[] = [];
 
+      // Fetch ICS feed events
       for (const folder of folders) {
         const res = await fetch(
-          `/api/calendar/${folder}?from=${from.toISOString()}&to=${to.toISOString()}`
+          `/api/calendar/${folder}?from=${from.toISOString()}&to=${to.toISOString()}`,
+          { cache: "no-store" }
         );
         const data = await res.json();
         allEvents.push(...(data.events || []));
+      }
+
+      // Fetch Microsoft calendar events if connected
+      if (microsoftConnected) {
+        try {
+          const msRes = await fetch(
+            `/api/calendar/microsoft?from=${from.toISOString()}&to=${to.toISOString()}`,
+            { cache: "no-store" }
+          );
+          if (msRes.ok) {
+            const msData = await msRes.json();
+            allEvents.push(...(msData.events || []));
+          }
+        } catch {
+          // Microsoft calendar fetch is optional
+        }
       }
 
       allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -71,17 +97,17 @@ export default function CalendarView() {
     } finally {
       setEventsLoading(false);
     }
-  }, [feeds]);
+  }, [feeds, microsoftConnected]);
 
   useEffect(() => {
     fetchFeeds();
   }, [fetchFeeds]);
 
   useEffect(() => {
-    if (feeds.length > 0) {
+    if (feeds.length > 0 || microsoftConnected) {
       fetchEvents();
     }
-  }, [feeds, fetchEvents]);
+  }, [feeds, microsoftConnected, fetchEvents]);
 
   async function addFeed(e: React.FormEvent) {
     e.preventDefault();
@@ -139,6 +165,44 @@ export default function CalendarView() {
         <p className="text-gray-500 mt-1">
           Je agenda-events uit Microsoft Calendar en Apple Calendar
         </p>
+      </div>
+
+      {/* Microsoft connection */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
+        <div className="flex items-center gap-3">
+          <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 23 23">
+            <rect x="1" y="1" width="10" height="10" fill="#f25022" />
+            <rect x="12" y="1" width="10" height="10" fill="#7fba00" />
+            <rect x="1" y="12" width="10" height="10" fill="#00a4ef" />
+            <rect x="12" y="12" width="10" height="10" fill="#ffb900" />
+          </svg>
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-900">Microsoft 365</p>
+            <p className="text-xs text-gray-400">
+              {microsoftConnected
+                ? "Agenda gekoppeld — events worden automatisch opgehaald"
+                : "Koppel je werkaccount voor agenda en later e-mail"}
+            </p>
+          </div>
+          {microsoftConnected ? (
+            <span className="text-xs font-medium text-green-600 bg-green-50 px-2.5 py-1 rounded-full">
+              Gekoppeld
+            </span>
+          ) : (
+            <button
+              onClick={async () => {
+                setMicrosoftLoading(true);
+                // Redirect to Microsoft sign-in via NextAuth
+                const { signIn } = await import("next-auth/react");
+                signIn("microsoft-entra-id", { callbackUrl: "/agenda" });
+              }}
+              disabled={microsoftLoading}
+              className="text-xs font-medium text-white bg-[#0078d4] px-3 py-1.5 rounded-lg hover:bg-[#106ebe] transition-colors disabled:opacity-50"
+            >
+              {microsoftLoading ? "Verbinden..." : "Koppelen"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Feed management */}
