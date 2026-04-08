@@ -57,7 +57,9 @@ export async function GET(request: NextRequest) {
     orderBy: [{ date: "asc" }, { createdAt: "desc" }],
   });
 
-  return Response.json(items);
+  return Response.json(items, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -80,5 +82,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return Response.json(item, { status: 201 });
+  return Response.json(item, {
+    status: 201,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

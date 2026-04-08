@@ -17,7 +17,9 @@ export async function GET(request: NextRequest) {
     orderBy: { updatedAt: "desc" },
   });
 
-  return Response.json(recipes);
+  return Response.json(recipes, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -36,5 +38,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return Response.json(recipe, { status: 201 });
+  return Response.json(recipe, {
+    status: 201,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

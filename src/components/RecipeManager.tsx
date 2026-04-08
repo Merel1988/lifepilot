@@ -44,7 +44,9 @@ export default function RecipeManager() {
     try {
       const url = filter ? `/api/recipes?category=${filter}` : "/api/recipes";
       const res = await fetch(url, { cache: "no-store" });
-      setRecipes(await res.json());
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data)) setRecipes(data);
     } finally {
       setLoading(false);
     }
@@ -83,22 +85,22 @@ export default function RecipeManager() {
       description: description || null,
     };
 
-    if (editingId) {
-      await fetch(`/api/recipes/${editingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } else {
-      await fetch("/api/recipes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, source: "manual" }),
-      });
-    }
+    const res = editingId
+      ? await fetch(`/api/recipes/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+      : await fetch("/api/recipes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, source: "manual" }),
+        });
+
+    if (!res.ok) return;
 
     setShowForm(false);
-    fetchRecipes();
+    await fetchRecipes();
   }
 
   async function handleDelete(id: string) {
