@@ -84,8 +84,8 @@ export default function MealPlanner() {
   const [extraVoorraad, setExtraVoorraad] = useState("");
 
   useEffect(() => {
-    fetch("/api/recipes").then((r) => r.json()).then(setRecipes).catch(() => {});
-    fetch("/api/pantry").then((r) => r.json()).then(setPantry).catch(() => {});
+    fetch("/api/recipes", { cache: "no-store" }).then((r) => r.json()).then(setRecipes).catch(() => {});
+    fetch("/api/pantry", { cache: "no-store" }).then((r) => r.json()).then(setPantry).catch(() => {});
   }, []);
 
   async function addPantryItems() {
@@ -139,7 +139,7 @@ export default function MealPlanner() {
   async function fetchAHBonus() {
     setAhLoading(true);
     try {
-      const res = await fetch("/api/ah-bonus");
+      const res = await fetch("/api/ah-bonus", { cache: "no-store" });
       const data = await res.json();
       if (data.products && data.products.length > 0) {
         const bonusText = data.products
@@ -236,7 +236,7 @@ export default function MealPlanner() {
         }),
       });
       // Refresh recipes list
-      const res = await fetch("/api/recipes");
+      const res = await fetch("/api/recipes", { cache: "no-store" });
       setRecipes(await res.json());
     } catch {
       // Silently fail

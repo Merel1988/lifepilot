@@ -43,7 +43,7 @@ export default function RecipeManager() {
     setLoading(true);
     try {
       const url = filter ? `/api/recipes?category=${filter}` : "/api/recipes";
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: "no-store" });
       setRecipes(await res.json());
     } finally {
       setLoading(false);

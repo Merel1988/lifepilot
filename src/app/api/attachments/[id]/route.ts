@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 // Download/serve attachment
 export async function GET(
   _request: NextRequest,
