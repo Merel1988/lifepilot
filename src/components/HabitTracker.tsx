@@ -120,7 +120,7 @@ export default function HabitTracker() {
     setEditName(habit.name);
 
     // Fetch full history (all completions, no date filter)
-    const res = await fetch("/api/habits?dateFrom=2020-01-01&dateTo=2099-12-31");
+    const res = await fetch("/api/habits?dateFrom=2020-01-01&dateTo=2099-12-31", { cache: "no-store" });
     const allHabits: Habit[] = await res.json();
     const full = allHabits.find((h) => h.id === habit.id);
     setDetailHabit(full || habit);

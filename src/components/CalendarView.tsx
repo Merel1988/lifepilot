@@ -41,7 +41,7 @@ export default function CalendarView() {
 
   const fetchFeeds = useCallback(async () => {
     try {
-      const res = await fetch("/api/calendar-feeds");
+      const res = await fetch("/api/calendar-feeds", { cache: "no-store" });
       setFeeds(await res.json());
     } finally {
       setLoading(false);

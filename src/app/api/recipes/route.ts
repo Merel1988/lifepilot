@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const denied = await requireAuth();
   if (denied) return denied;
@@ -15,7 +17,9 @@ export async function GET(request: NextRequest) {
     orderBy: { updatedAt: "desc" },
   });
 
-  return Response.json(recipes);
+  return Response.json(recipes, {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -34,5 +38,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return Response.json(recipe, { status: 201 });
+  return Response.json(recipe, {
+    status: 201,
+    headers: { "Cache-Control": "no-store" },
+  });
 }

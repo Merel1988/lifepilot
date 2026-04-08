@@ -42,7 +42,8 @@ export default function Dashboard() {
       const todayEnd = new Date(today);
       todayEnd.setHours(23, 59, 59, 999);
       const todayRes = await fetch(
-        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=false&includeRecurring=true`
+        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=false&includeRecurring=true`,
+        { cache: "no-store" }
       );
       const todayAll: Item[] = await todayRes.json();
 
@@ -54,7 +55,8 @@ export default function Dashboard() {
 
       // Fetch overdue items (past dates, not completed, non-recurring)
       const overdueRes = await fetch(
-        `/api/items?dateTo=${today.toISOString()}&completed=false`
+        `/api/items?dateTo=${today.toISOString()}&completed=false`,
+        { cache: "no-store" }
       );
       const overdueAll: Item[] = await overdueRes.json();
       const overdueItems = overdueAll.filter(
@@ -84,7 +86,8 @@ export default function Dashboard() {
         endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
         endOfWeek.setHours(23, 59, 59, 999);
         const weekRes = await fetch(
-          `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfWeek.toISOString()}&completed=false`
+          `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfWeek.toISOString()}&completed=false`,
+          { cache: "no-store" }
         );
         const weekItems: Item[] = await weekRes.json();
         const filtered = weekItems.filter((i) => !i.recurring && !seenIds.has(i.id));
@@ -98,7 +101,8 @@ export default function Dashboard() {
           const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
           endOfMonth.setHours(23, 59, 59, 999);
           const monthRes = await fetch(
-            `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfMonth.toISOString()}&completed=false`
+            `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfMonth.toISOString()}&completed=false`,
+            { cache: "no-store" }
           );
           const monthItems: Item[] = await monthRes.json();
           const filteredMonth = monthItems.filter((i) => !i.recurring && !seenIds.has(i.id));
@@ -112,7 +116,8 @@ export default function Dashboard() {
             const endOfYear = new Date(today.getFullYear(), 11, 31);
             endOfYear.setHours(23, 59, 59, 999);
             const yearRes = await fetch(
-              `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfYear.toISOString()}&completed=false`
+              `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfYear.toISOString()}&completed=false`,
+              { cache: "no-store" }
             );
             const yearItems: Item[] = await yearRes.json();
             const filteredYear = yearItems.filter((i) => !i.recurring && !seenIds.has(i.id));
@@ -131,7 +136,8 @@ export default function Dashboard() {
         const calEvents: CalendarEvent[] = [];
         for (const f of folders) {
           const calRes = await fetch(
-            `/api/calendar/${f}?from=${today.toISOString()}&to=${todayEnd.toISOString()}`
+            `/api/calendar/${f}?from=${today.toISOString()}&to=${todayEnd.toISOString()}`,
+            { cache: "no-store" }
           );
           if (calRes.ok) {
             const calData = await calRes.json();
@@ -146,7 +152,8 @@ export default function Dashboard() {
 
       // Fetch completed items for today
       const completedRes = await fetch(
-        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`
+        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`,
+        { cache: "no-store" }
       );
       const completedAll: Item[] = await completedRes.json();
       setCompletedItems(completedAll.filter((i) => !i.recurring));

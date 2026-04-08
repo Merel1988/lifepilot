@@ -1,5 +1,7 @@
 import { requireAuth } from "@/lib/auth-guard";
 
+export const dynamic = "force-dynamic";
+
 interface AHProduct {
   title: string;
   bonusMechanism: string | null;

@@ -30,7 +30,7 @@ export default function FolderView({ folder }: FolderViewProps) {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/items?folder=${folder}&includeRecurring=true`);
+      const res = await fetch(`/api/items?folder=${folder}&includeRecurring=true`, { cache: "no-store" });
       const allItems: Item[] = await res.json();
 
       const filtered = allItems.filter((item) => {

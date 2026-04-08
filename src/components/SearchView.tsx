@@ -22,7 +22,7 @@ export default function SearchView() {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await fetch(`/api/items?q=${encodeURIComponent(q)}&includeRecurring=true`);
+      const res = await fetch(`/api/items?q=${encodeURIComponent(q)}&includeRecurring=true`, { cache: "no-store" });
       const items: Item[] = await res.json();
       setResults(items);
     } finally {

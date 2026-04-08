@@ -3,6 +3,8 @@ import { requireAuth } from "@/lib/auth-guard";
 import { NextRequest } from "next/server";
 import { parseICS, filterEventsByDateRange } from "@/lib/ics-parser";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/calendar/[folder]?from=ISO&to=ISO
  * Fetches events from all enabled calendar feeds for the given folder/date range.
