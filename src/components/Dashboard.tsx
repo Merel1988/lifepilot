@@ -31,8 +31,8 @@ export default function Dashboard() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
-  const fetchItems = useCallback(async () => {
-    setLoading(true);
+  const fetchItems = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -167,15 +167,31 @@ export default function Dashboard() {
   }, [fetchItems]);
 
   useEffect(() => {
-    const handler = () => fetchItems();
+    const handler = () => fetchItems(true);
     window.addEventListener("item-moved", handler);
     return () => window.removeEventListener("item-moved", handler);
   }, [fetchItems]);
 
   async function handleToggle(id: string, completed: boolean) {
-    // Check if this is a recurring item
     const item = sections.flatMap((s) => s.items).find((i) => i.id === id);
-    if (item?.recurring) {
+    if (!item) return;
+
+    // Optimistic update: remove from sections, add to completed (or vice versa)
+    if (completed) {
+      setSections((prev) =>
+        prev
+          .map((s) => ({ ...s, items: s.items.filter((i) => i.id !== id) }))
+          .filter((s) => s.items.length > 0)
+      );
+      if (!item.recurring) {
+        setCompletedItems((prev) => [{ ...item, completed: true }, ...prev]);
+      }
+    } else {
+      setCompletedItems((prev) => prev.filter((i) => i.id !== id));
+    }
+
+    // API call in background
+    if (item.recurring) {
       const todayStr = getTodayDateString();
       await fetch(`/api/items/${id}/complete`, {
         method: "POST",
@@ -189,12 +205,21 @@ export default function Dashboard() {
         body: JSON.stringify({ completed }),
       });
     }
-    fetchItems();
+    // Silent refresh to sync state from server
+    fetchItems(true);
   }
 
   async function handleDelete(id: string) {
+    // Optimistic update: remove item immediately
+    setSections((prev) =>
+      prev
+        .map((s) => ({ ...s, items: s.items.filter((i) => i.id !== id) }))
+        .filter((s) => s.items.length > 0)
+    );
+    setCompletedItems((prev) => prev.filter((i) => i.id !== id));
+
     await fetch(`/api/items/${id}`, { method: "DELETE" });
-    fetchItems();
+    fetchItems(true);
   }
 
   const now = new Date();
