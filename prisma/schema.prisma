@@ -106,7 +106,10 @@ model Recipe {
   category    String   @default("AVONDETEN") // ONTBIJT, LUNCH, AVONDETEN, OVERIG
   ingredients String?  // Comma-separated or free text
   description String?  // Preparation notes
-  source      String?  // "manual" or mealPlan ID it came from
+  servings    Int      @default(4)
+  favorite    Boolean  @default(false)
+  sourceUrl   String?  // Original URL if imported from link
+  source      String?  // "manual", "url", "photo", or mealPlan ID
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

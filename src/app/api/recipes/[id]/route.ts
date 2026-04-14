@@ -17,6 +17,9 @@ export async function PATCH(
   if (body.category !== undefined) data.category = body.category;
   if (body.ingredients !== undefined) data.ingredients = body.ingredients;
   if (body.description !== undefined) data.description = body.description;
+  if (body.servings !== undefined) data.servings = body.servings;
+  if (body.favorite !== undefined) data.favorite = body.favorite;
+  if (body.sourceUrl !== undefined) data.sourceUrl = body.sourceUrl;
 
   const recipe = await prisma.recipe.update({ where: { id }, data });
   return Response.json(recipe);

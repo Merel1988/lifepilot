@@ -84,7 +84,7 @@ export default function MealPlanner() {
   const [extraVoorraad, setExtraVoorraad] = useState("");
 
   useEffect(() => {
-    fetch("/api/recipes", { cache: "no-store" }).then((r) => r.json()).then(setRecipes).catch(() => {});
+    fetch("/api/recipes?favorite=true", { cache: "no-store" }).then((r) => r.json()).then(setRecipes).catch(() => {});
     fetch("/api/pantry", { cache: "no-store" }).then((r) => r.json()).then(setPantry).catch(() => {});
   }, []);
 
@@ -232,11 +232,12 @@ export default function MealPlanner() {
           title: dag.maaltijd,
           category,
           description: dag.notitie || null,
+          favorite: true,
           source: "mealplan",
         }),
       });
-      // Refresh recipes list
-      const res = await fetch("/api/recipes", { cache: "no-store" });
+      // Refresh favorites list
+      const res = await fetch("/api/recipes?favorite=true", { cache: "no-store" });
       setRecipes(await res.json());
     } catch {
       // Silently fail

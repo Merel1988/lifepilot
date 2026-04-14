@@ -9,8 +9,10 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
 
   const category = request.nextUrl.searchParams.get("category");
+  const favorite = request.nextUrl.searchParams.get("favorite");
   const where: Record<string, unknown> = {};
   if (category) where.category = category;
+  if (favorite === "true") where.favorite = true;
 
   const recipes = await prisma.recipe.findMany({
     where,
@@ -34,6 +36,9 @@ export async function POST(request: NextRequest) {
       category: body.category || "AVONDETEN",
       ingredients: body.ingredients || null,
       description: body.description || null,
+      servings: body.servings ?? 4,
+      favorite: body.favorite ?? false,
+      sourceUrl: body.sourceUrl || null,
       source: body.source || "manual",
     },
   });

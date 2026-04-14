@@ -37,34 +37,38 @@ export default function Dashboard() {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayStr = getTodayDateString();
-
-      // Fetch today's items + recurring
       const todayEnd = new Date(today);
       todayEnd.setHours(23, 59, 59, 999);
-      const todayRes = await fetch(
-        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=false&includeRecurring=true`,
-        { cache: "no-store" }
-      );
-      const todayAll: Item[] = await todayRes.json();
+      const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
 
-      // Split into regular today items and recurring items for today
+      // Parallel fetch: today+recurring, overdue, all future (up to year), completed, calendar
+      const [todayRes, overdueRes, futureRes, completedRes, ...calRes] = await Promise.all([
+        fetch(`/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=false&includeRecurring=true`, { cache: "no-store" }),
+        fetch(`/api/items?dateTo=${today.toISOString()}&completed=false`, { cache: "no-store" }),
+        fetch(`/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfYear.toISOString()}&completed=false`, { cache: "no-store" }),
+        fetch(`/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`, { cache: "no-store" }),
+        ...["PRIVE", "WERK", "JANNIE_MEPPEL"].map((f) =>
+          fetch(`/api/calendar/${f}?from=${today.toISOString()}&to=${todayEnd.toISOString()}`, { cache: "no-store" }).catch(() => null)
+        ),
+      ]);
+
+      const todayAll: Item[] = await todayRes.json();
+      const overdueAll: Item[] = await overdueRes.json();
+      const futureAll: Item[] = await futureRes.json();
+      const completedAll: Item[] = await completedRes.json();
+
+      // Process today items
       const todayItems = todayAll.filter((i) => !i.recurring);
       const recurringItems = todayAll
         .filter((i) => i.recurring && isRecurringToday(i))
         .filter((i) => !isCompletedForDate(i, todayStr));
 
-      // Fetch overdue items (past dates, not completed, non-recurring)
-      const overdueRes = await fetch(
-        `/api/items?dateTo=${today.toISOString()}&completed=false`,
-        { cache: "no-store" }
-      );
-      const overdueAll: Item[] = await overdueRes.json();
+      // Process overdue
       const overdueItems = overdueAll.filter(
         (item) => !item.recurring && item.date && new Date(item.date) < today
       );
 
       const result: Section[] = [];
-
       if (overdueItems.length > 0) {
         result.push({ label: "Achterstallig", items: overdueItems });
       }
@@ -74,96 +78,76 @@ export default function Dashboard() {
         result.push({ label: "Vandaag", items: todayCombined });
       }
 
-      const seenIds = new Set([
-        ...todayAll.map((i) => i.id),
-        ...overdueItems.map((i) => i.id),
-      ]);
+      // Build week/month/year sections from the single future fetch
+      const seenIds = new Set([...todayAll.map((i) => i.id), ...overdueItems.map((i) => i.id)]);
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
+      endOfWeek.setHours(23, 59, 59, 999);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
 
-      // If we have room, fetch this week
-      const totalSoFar = todayCombined.length + overdueItems.length;
-      if (totalSoFar < 10) {
-        const endOfWeek = new Date(today);
-        endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-        endOfWeek.setHours(23, 59, 59, 999);
-        const weekRes = await fetch(
-          `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfWeek.toISOString()}&completed=false`,
-          { cache: "no-store" }
-        );
-        const weekItems: Item[] = await weekRes.json();
-        const filtered = weekItems.filter((i) => !i.recurring && !seenIds.has(i.id));
-        if (filtered.length > 0) {
-          result.push({ label: "Deze week", items: filtered });
-          filtered.forEach((i) => seenIds.add(i.id));
-        }
+      const weekItems: Item[] = [];
+      const monthItems: Item[] = [];
+      const yearItems: Item[] = [];
 
-        // If still room, fetch this month
-        if (totalSoFar + filtered.length < 10) {
-          const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-          endOfMonth.setHours(23, 59, 59, 999);
-          const monthRes = await fetch(
-            `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfMonth.toISOString()}&completed=false`,
-            { cache: "no-store" }
-          );
-          const monthItems: Item[] = await monthRes.json();
-          const filteredMonth = monthItems.filter((i) => !i.recurring && !seenIds.has(i.id));
-          if (filteredMonth.length > 0) {
-            result.push({ label: "Deze maand", items: filteredMonth });
-            filteredMonth.forEach((i) => seenIds.add(i.id));
-          }
-
-          // If still room, fetch this year
-          if (totalSoFar + filtered.length + filteredMonth.length < 10) {
-            const endOfYear = new Date(today.getFullYear(), 11, 31);
-            endOfYear.setHours(23, 59, 59, 999);
-            const yearRes = await fetch(
-              `/api/items?dateFrom=${today.toISOString()}&dateTo=${endOfYear.toISOString()}&completed=false`,
-              { cache: "no-store" }
-            );
-            const yearItems: Item[] = await yearRes.json();
-            const filteredYear = yearItems.filter((i) => !i.recurring && !seenIds.has(i.id));
-            if (filteredYear.length > 0) {
-              result.push({ label: "Dit jaar", items: filteredYear });
-            }
-          }
-        }
+      for (const item of futureAll) {
+        if (item.recurring || seenIds.has(item.id)) continue;
+        seenIds.add(item.id);
+        const d = new Date(item.date!);
+        if (d <= todayEnd) continue; // already in today
+        if (d <= endOfWeek) weekItems.push(item);
+        else if (d <= endOfMonth) monthItems.push(item);
+        else yearItems.push(item);
       }
+
+      if (weekItems.length > 0) result.push({ label: "Deze week", items: weekItems });
+      if (monthItems.length > 0) result.push({ label: "Deze maand", items: monthItems });
+      if (yearItems.length > 0) result.push({ label: "Dit jaar", items: yearItems });
 
       setSections(result);
-
-      // Fetch calendar events for today
-      try {
-        const folders = ["PRIVE", "WERK", "JANNIE_MEPPEL"];
-        const calEvents: CalendarEvent[] = [];
-        for (const f of folders) {
-          const calRes = await fetch(
-            `/api/calendar/${f}?from=${today.toISOString()}&to=${todayEnd.toISOString()}`,
-            { cache: "no-store" }
-          );
-          if (calRes.ok) {
-            const calData = await calRes.json();
-            calEvents.push(...(calData.events || []));
-          }
-        }
-        calEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-        setCalendarEvents(calEvents);
-      } catch {
-        // Calendar fetch is optional
-      }
-
-      // Fetch completed items for today
-      const completedRes = await fetch(
-        `/api/items?dateFrom=${today.toISOString()}&dateTo=${todayEnd.toISOString()}&completed=true`,
-        { cache: "no-store" }
-      );
-      const completedAll: Item[] = await completedRes.json();
       setCompletedItems(completedAll.filter((i) => !i.recurring));
+
+      // Process calendar events
+      const calEvents: CalendarEvent[] = [];
+      for (const res of calRes) {
+        if (res && res.ok) {
+          try {
+            const calData = await res.json();
+            calEvents.push(...(calData.events || []));
+          } catch { /* skip */ }
+        }
+      }
+      calEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      setCalendarEvents(calEvents);
+
+      // Cache for instant load next time
+      try {
+        localStorage.setItem("dashboard-cache", JSON.stringify({
+          sections: result, completedItems: completedAll.filter((i) => !i.recurring), calendarEvents: calEvents, ts: Date.now(),
+        }));
+      } catch { /* quota exceeded, ignore */ }
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Load cached data instantly, then refresh from server
   useEffect(() => {
-    fetchItems();
+    let hasCache = false;
+    try {
+      const cached = localStorage.getItem("dashboard-cache");
+      if (cached) {
+        const { sections: s, completedItems: c, calendarEvents: e, ts } = JSON.parse(cached);
+        if (Date.now() - ts < 5 * 60 * 1000) {
+          setSections(s);
+          setCompletedItems(c);
+          setCalendarEvents(e);
+          setLoading(false);
+          hasCache = true;
+        }
+      }
+    } catch { /* corrupted cache, ignore */ }
+    // If cache was shown, refresh silently in background; otherwise show spinner
+    fetchItems(hasCache);
   }, [fetchItems]);
 
   useEffect(() => {
