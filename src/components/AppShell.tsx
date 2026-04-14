@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Sidebar from "./Sidebar";
 
 interface AppShellProps {
@@ -12,17 +11,6 @@ interface AppShellProps {
 
 export default function AppShell({ children, userName, userImage }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const router = useRouter();
-
-  const handleMoveItem = useCallback(async (itemId: string, newFolder: string) => {
-    await fetch(`/api/items/${itemId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ folder: newFolder }),
-    });
-    router.refresh();
-    window.dispatchEvent(new CustomEvent("item-moved"));
-  }, [router]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -31,7 +19,6 @@ export default function AppShell({ children, userName, userImage }: AppShellProp
         onClose={() => setSidebarOpen(false)}
         userName={userName}
         userImage={userImage}
-        onMoveItem={handleMoveItem}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">

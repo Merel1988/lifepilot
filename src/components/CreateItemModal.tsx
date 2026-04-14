@@ -18,12 +18,13 @@ interface CreateItemModalProps {
   open: boolean;
   onClose: () => void;
   onCreated: () => void;
+  defaultType?: ItemType;
 }
 
-export default function CreateItemModal({ open, onClose, onCreated }: CreateItemModalProps) {
+export default function CreateItemModal({ open, onClose, onCreated, defaultType }: CreateItemModalProps) {
   const today = new Date().toISOString().split("T")[0];
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<ItemType>("TASK");
+  const [type, setType] = useState<ItemType>(defaultType || "TASK");
   const [date, setDate] = useState(today);
   const [folder, setFolder] = useState<MainFolder>(getDefaultFolder());
   const [description, setDescription] = useState("");
