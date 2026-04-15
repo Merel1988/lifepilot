@@ -1,5 +1,5 @@
--- Migration: add missing tables
--- Safe to run on existing database - uses IF NOT EXISTS
+-- Migration: add missing tables and columns
+-- Safe to run on existing database - uses IF NOT EXISTS and handles SQLite ALTER TABLE
 
 -- NextAuth tables for OAuth token storage (Microsoft, etc.)
 CREATE TABLE IF NOT EXISTS "User" (
@@ -44,10 +44,19 @@ CREATE TABLE IF NOT EXISTS "Recipe" (
     "category" TEXT NOT NULL DEFAULT 'AVONDETEN',
     "ingredients" TEXT,
     "description" TEXT,
+    "servings" INTEGER NOT NULL DEFAULT 4,
+    "favorite" BOOLEAN NOT NULL DEFAULT false,
+    "sourceUrl" TEXT,
     "source" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
+
+-- Add new columns to existing Recipe table (SQLite supports ADD COLUMN IF NOT EXISTS via libsql)
+-- If the table was already created without these columns, add them:
+ALTER TABLE "Recipe" ADD COLUMN "servings" INTEGER NOT NULL DEFAULT 4;
+ALTER TABLE "Recipe" ADD COLUMN "favorite" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Recipe" ADD COLUMN "sourceUrl" TEXT;
 
 CREATE TABLE IF NOT EXISTS "PantryItem" (
     "id" TEXT NOT NULL PRIMARY KEY,
