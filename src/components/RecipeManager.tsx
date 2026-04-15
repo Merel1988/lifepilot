@@ -24,7 +24,7 @@ const CATEGORIES = [
 
 const CATEGORY_COLORS: Record<string, string> = {
   ONTBIJT: "bg-amber-100 text-amber-800",
-  LUNCH: "bg-blue-100 text-blue-800",
+  LUNCH: "bg-violet-100 text-violet-800",
   AVONDETEN: "bg-green-100 text-green-800",
   OVERIG: "bg-gray-100 text-gray-800",
 };

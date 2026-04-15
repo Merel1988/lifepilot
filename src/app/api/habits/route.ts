@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   const habit = await prisma.habit.create({
     data: {
       name: body.name,
-      color: body.color || "#2563eb",
+      color: body.color || "#7c3aed",
       frequency: body.frequency || "DAILY",
       customDays: body.customDays || null,
     },

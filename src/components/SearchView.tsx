@@ -76,7 +76,7 @@ export default function SearchView() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Zoek op titel..."
-          className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400 text-sm shadow-sm"
+          className="w-full pl-12 pr-4 py-3.5 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-gray-900 placeholder-gray-400 text-sm shadow-sm"
           autoFocus
         />
         {query && (
@@ -93,7 +93,7 @@ export default function SearchView() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : searched && results.length === 0 ? (
         <div className="text-center py-12">

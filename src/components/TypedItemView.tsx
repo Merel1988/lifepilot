@@ -207,7 +207,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
           onClick={() => setFolderFilter(null)}
           className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
             folderFilter === null
-              ? "bg-blue-600 text-white"
+              ? "bg-violet-600 text-white"
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           }`}
         >
@@ -219,7 +219,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
             onClick={() => setFolderFilter(f.id)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
               folderFilter === f.id
-                ? "bg-blue-600 text-white"
+                ? "bg-violet-600 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
@@ -230,7 +230,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
 
       <button
         onClick={() => setShowCreate(true)}
-        className="w-full mb-6 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 font-medium text-sm"
+        className="w-full mb-6 flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-600/20 font-medium text-sm"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -240,7 +240,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : totalItems === 0 && completedItems.length === 0 ? (
         <div className="text-center py-12">

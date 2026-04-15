@@ -121,7 +121,7 @@ export default function RichTextEditor({
   if (!editor) return null;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent">
+    <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-violet-500 focus-within:border-transparent">
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap">
         <ToolbarButton
@@ -226,7 +226,7 @@ function ToolbarButton({
       title={title}
       className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
         active
-          ? "bg-blue-100 text-blue-700"
+          ? "bg-violet-100 text-violet-700"
           : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
       }`}
     >

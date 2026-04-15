@@ -14,7 +14,7 @@ export default function ItemCard({ item, onToggle, onDelete, onEdit }: ItemCardP
   const folderLabel = MAIN_FOLDERS.find((f) => f.id === item.folder)?.label ?? item.folder;
   const typeLabels: Record<string, string> = { TASK: "Taak", REMINDER: "Herinnering", NOTE: "Notitie" };
   const typeColors: Record<string, string> = {
-    TASK: "bg-blue-100 text-blue-700",
+    TASK: "bg-violet-100 text-violet-700",
     REMINDER: "bg-amber-100 text-amber-700",
     NOTE: "bg-green-100 text-green-700",
   };
@@ -42,7 +42,7 @@ export default function ItemCard({ item, onToggle, onDelete, onEdit }: ItemCardP
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(item.id, !completedToday); }}
           className={`mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-            completedToday ? "bg-blue-600 border-blue-600" : "border-gray-300 hover:border-blue-400"
+            completedToday ? "bg-violet-600 border-violet-600" : "border-gray-300 hover:border-violet-400"
           }`}
         >
           {completedToday && (

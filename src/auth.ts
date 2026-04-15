@@ -6,12 +6,11 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    Apple,
-    GitHub,
-    Google,
+const providers = [Apple, GitHub, Google];
+
+// Only include Microsoft provider if credentials are set
+if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
+  providers.push(
     MicrosoftEntraID({
       clientId: process.env.MICROSOFT_CLIENT_ID,
       clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
@@ -20,8 +19,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           scope: "openid profile email User.Read Calendars.Read Mail.Read offline_access",
         },
       },
-    }),
-  ],
+    })
+  );
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  providers,
   session: {
     strategy: "jwt",
   },

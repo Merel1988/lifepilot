@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       name: body.name,
       url: body.url,
       folder: body.folder || "PRIVE",
-      color: body.color || "#2563eb",
+      color: body.color || "#7c3aed",
       enabled: body.enabled ?? true,
     },
   });

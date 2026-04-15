@@ -24,7 +24,7 @@ interface CalendarEvent {
   feedColor: string;
 }
 
-const PRESET_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
+const PRESET_COLORS = ["#7c3aed", "#dc2626", "#16a34a", "#9333ea", "#ea580c", "#0891b2"];
 
 export default function CalendarView() {
   const [feeds, setFeeds] = useState<CalendarFeed[]>([]);
@@ -39,7 +39,7 @@ export default function CalendarView() {
   const [newName, setNewName] = useState("");
   const [newUrl, setNewUrl] = useState("");
   const [newFolder, setNewFolder] = useState("PRIVE");
-  const [newColor, setNewColor] = useState("#2563eb");
+  const [newColor, setNewColor] = useState("#7c3aed");
 
   const fetchFeeds = useCallback(async () => {
     try {
@@ -127,7 +127,7 @@ export default function CalendarView() {
     setNewName("");
     setNewUrl("");
     setNewFolder("PRIVE");
-    setNewColor("#2563eb");
+    setNewColor("#7c3aed");
     setShowAddFeed(false);
     fetchFeeds();
   }
@@ -211,7 +211,7 @@ export default function CalendarView() {
           <h3 className="text-sm font-semibold text-gray-900">Gekoppelde agenda&apos;s</h3>
           <button
             onClick={() => setShowAddFeed(!showAddFeed)}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-violet-600 hover:text-violet-700"
           >
             {showAddFeed ? "Annuleren" : "+ Toevoegen"}
           </button>
@@ -219,7 +219,7 @@ export default function CalendarView() {
 
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : feeds.length === 0 && !showAddFeed ? (
           <div className="text-center py-4">
@@ -246,7 +246,7 @@ export default function CalendarView() {
                 <button
                   onClick={() => toggleFeed(feed.id, !feed.enabled)}
                   className={`relative w-8 h-4 rounded-full transition-colors flex-shrink-0 ${
-                    feed.enabled ? "bg-blue-600" : "bg-gray-200"
+                    feed.enabled ? "bg-violet-600" : "bg-gray-200"
                   }`}
                 >
                   <span
@@ -276,7 +276,7 @@ export default function CalendarView() {
               placeholder="Naam (bijv. Werk agenda)"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
               autoFocus
             />
             <input
@@ -284,7 +284,7 @@ export default function CalendarView() {
               placeholder="webcal:// of https:// ICS feed URL"
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
             />
             <div className="flex gap-3">
               <div className="flex-1">
@@ -292,7 +292,7 @@ export default function CalendarView() {
                 <select
                   value={newFolder}
                   onChange={(e) => setNewFolder(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 >
                   {MAIN_FOLDERS.map((f) => (
                     <option key={f.id} value={f.id}>{f.label}</option>
@@ -332,7 +332,7 @@ export default function CalendarView() {
             <button
               type="submit"
               disabled={!newName.trim() || !newUrl.trim()}
-              className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Agenda toevoegen
             </button>
@@ -343,7 +343,7 @@ export default function CalendarView() {
       {/* Events display */}
       {eventsLoading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : Object.keys(eventsByDay).length === 0 ? (
         feeds.length > 0 ? (

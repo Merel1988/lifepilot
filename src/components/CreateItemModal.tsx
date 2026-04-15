@@ -101,7 +101,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
               placeholder="Wat moet er gebeuren?"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-400"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-gray-900 placeholder-gray-400"
               autoFocus
             />
 
@@ -111,7 +111,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value as ItemType)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 >
                   {ITEM_TYPES.map((t) => (
                     <option key={t.id} value={t.id}>{t.label}</option>
@@ -126,7 +126,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                 </div>
               )}
@@ -138,7 +138,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                     type="time"
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                 </div>
               )}
@@ -151,7 +151,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                   <select
                     value={folder}
                     onChange={(e) => setFolder(e.target.value as MainFolder)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                   >
                     {MAIN_FOLDERS.map((f) => (
                       <option key={f.id} value={f.id}>{f.label}</option>
@@ -169,7 +169,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                           if (!recurring) setRecurrenceDays([]);
                         }}
                         className={`relative w-10 h-5 rounded-full transition-colors ${
-                          recurring ? "bg-blue-600" : "bg-gray-200"
+                          recurring ? "bg-violet-600" : "bg-gray-200"
                         }`}
                       >
                         <span
@@ -192,7 +192,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
                               onClick={() => toggleDay(day.id)}
                               className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
                                 selected
-                                  ? "bg-blue-600 text-white"
+                                  ? "bg-violet-600 text-white"
                                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                               }`}
                             >
@@ -239,7 +239,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
               <button
                 type="button"
                 onClick={() => setShowMore(true)}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                className="text-sm text-violet-600 hover:text-violet-700 font-medium"
               >
                 Meer opties
               </button>
@@ -257,7 +257,7 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
             <button
               type="submit"
               disabled={!title.trim() || saving || (recurring && recurrenceDays.length === 0)}
-              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? "Opslaan..." : "Toevoegen"}
             </button>

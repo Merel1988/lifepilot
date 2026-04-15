@@ -19,7 +19,7 @@ interface Habit {
 }
 
 const COLORS = [
-  "#2563eb", "#dc2626", "#16a34a", "#9333ea", "#ea580c",
+  "#7c3aed", "#dc2626", "#16a34a", "#9333ea", "#ea580c",
   "#0891b2", "#d946ef", "#ca8a04", "#4f46e5", "#059669",
 ];
 
@@ -272,7 +272,7 @@ export default function HabitTracker() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : habits.length === 0 ? (
           <div className="text-center py-12 px-4">
@@ -321,7 +321,7 @@ export default function HabitTracker() {
                   <div className="flex items-center gap-0">
                     {weekDates.map((date, i) => (
                       <div key={date} className="flex-1 flex flex-col items-center gap-0.5">
-                        <span className={`text-[10px] font-medium ${date === todayStr ? "text-blue-600" : "text-gray-300"}`}>
+                        <span className={`text-[10px] font-medium ${date === todayStr ? "text-violet-600" : "text-gray-300"}`}>
                           {DAY_NAMES[i]}
                         </span>
                         {renderWeekDot(habit, date)}
@@ -338,7 +338,7 @@ export default function HabitTracker() {
         {!showCreate ? (
           <button
             onClick={() => setShowCreate(true)}
-            className="w-full px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 transition-colors font-medium border-t border-gray-100 flex items-center justify-center gap-1.5"
+            className="w-full px-4 py-3 text-sm text-violet-600 hover:bg-violet-50 transition-colors font-medium border-t border-gray-100 flex items-center justify-center gap-1.5"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -352,7 +352,7 @@ export default function HabitTracker() {
               placeholder="Naam van de gewoonte..."
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-gray-400"
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && createHabit()}
             />
@@ -384,7 +384,7 @@ export default function HabitTracker() {
                   onClick={() => setNewFrequency(f.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     newFrequency === f.id
-                      ? "bg-blue-600 text-white"
+                      ? "bg-violet-600 text-white"
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
@@ -415,7 +415,7 @@ export default function HabitTracker() {
                       }
                       className={`w-9 h-9 rounded-full text-xs font-medium transition-colors ${
                         selected
-                          ? "bg-blue-600 text-white"
+                          ? "bg-violet-600 text-white"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                       }`}
                     >
@@ -436,7 +436,7 @@ export default function HabitTracker() {
               <button
                 onClick={createHabit}
                 disabled={!newName.trim()}
-                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 disabled:opacity-50 transition-colors"
               >
                 Toevoegen
               </button>
@@ -476,13 +476,13 @@ export default function HabitTracker() {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && saveHabitName()}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                   {editName !== selectedHabit.name && (
                     <button
                       onClick={saveHabitName}
                       disabled={savingName || !editName.trim()}
-                      className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      className="px-3 py-2 text-sm font-medium text-white bg-violet-600 rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
                     >
                       {savingName ? "..." : "Opslaan"}
                     </button>

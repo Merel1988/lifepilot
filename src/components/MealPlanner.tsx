@@ -29,7 +29,7 @@ const BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> 
   snel: { bg: "bg-amber-100", text: "text-amber-800", label: "Snel!" },
   frietjes: { bg: "bg-pink-100", text: "text-pink-800", label: "Frietjes!" },
   bonus: { bg: "bg-green-100", text: "text-green-800", label: "Bonus" },
-  prep: { bg: "bg-blue-100", text: "text-blue-800", label: "Prep dag" },
+  prep: { bg: "bg-violet-100", text: "text-violet-800", label: "Prep dag" },
   restjes: { bg: "bg-orange-100", text: "text-orange-800", label: "Restjesdag" },
   favoriet: { bg: "bg-red-100", text: "text-red-800", label: "Favoriet" },
 };

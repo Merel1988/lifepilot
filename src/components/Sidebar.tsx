@@ -199,7 +199,7 @@ function NavLink({
   children: React.ReactNode;
 }) {
   const isActive = pathname === href;
-  const activeClass = color === "green" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700";
+  const activeClass = color === "green" ? "bg-green-50 text-green-700" : "bg-violet-50 text-violet-700";
 
   return (
     <Link
@@ -240,7 +240,7 @@ function SubItems({
           onClick={onClick}
           className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
             !currentTime
-              ? "bg-blue-100 text-blue-700 font-medium"
+              ? "bg-violet-100 text-violet-700 font-medium"
               : "text-gray-500 hover:bg-gray-100"
           }`}
         >
@@ -254,7 +254,7 @@ function SubItems({
           onClick={onClick}
           className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
             active && currentTime === sub.id
-              ? "bg-blue-100 text-blue-700 font-medium"
+              ? "bg-violet-100 text-violet-700 font-medium"
               : "text-gray-500 hover:bg-gray-100"
           }`}
         >
