@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 interface SidebarProps {
   open: boolean;
@@ -10,8 +10,18 @@ interface SidebarProps {
   userImage?: string | null;
 }
 
+const TIME_SUBITEMS = [
+  { id: "vandaag", label: "Vandaag" },
+  { id: "deze-week", label: "Deze week" },
+  { id: "deze-maand", label: "Deze maand" },
+  { id: "dit-jaar", label: "Dit jaar" },
+  { id: "ooit", label: "Ooit" },
+];
+
 export default function Sidebar({ open, onClose, userName, userImage }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentTime = searchParams.get("tijd");
 
   return (
     <>
@@ -71,25 +81,38 @@ export default function Sidebar({ open, onClose, userName, userImage }: SidebarP
           {/* Separator */}
           <div className="border-t border-gray-200" />
 
-          {/* Item type navigation */}
+          {/* Item type navigation with time subitems */}
           <div>
             <h3 className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Items</h3>
             <div className="space-y-0.5">
+              {/* Taken */}
               <NavLink href="/taken" pathname={pathname} onClick={onClose} icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               }>Taken</NavLink>
+              {pathname === "/taken" && (
+                <SubItems basePath="/taken" currentTime={currentTime} onClick={onClose} />
+              )}
+
+              {/* Herinneringen */}
               <NavLink href="/herinneringen" pathname={pathname} onClick={onClose} icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               }>Herinneringen</NavLink>
+              {pathname === "/herinneringen" && (
+                <SubItems basePath="/herinneringen" currentTime={currentTime} onClick={onClose} />
+              )}
+
+              {/* Notities (no time subitems — notes don't have dates) */}
               <NavLink href="/notities" pathname={pathname} onClick={onClose} icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               }>Notities</NavLink>
+
+              {/* Agenda */}
               <NavLink href="/agenda" pathname={pathname} onClick={onClose} icon={
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -157,5 +180,45 @@ function NavLink({
       {icon}
       {children}
     </Link>
+  );
+}
+
+function SubItems({
+  basePath,
+  currentTime,
+  onClick,
+}: {
+  basePath: string;
+  currentTime: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <div className="ml-9 space-y-0.5 mt-0.5 mb-1">
+      <Link
+        href={basePath}
+        onClick={onClick}
+        className={`block px-3 py-1 rounded-md text-xs transition-colors ${
+          !currentTime
+            ? "bg-blue-100 text-blue-700 font-medium"
+            : "text-gray-500 hover:bg-gray-100"
+        }`}
+      >
+        Alles
+      </Link>
+      {TIME_SUBITEMS.map((sub) => (
+        <Link
+          key={sub.id}
+          href={`${basePath}?tijd=${sub.id}`}
+          onClick={onClick}
+          className={`block px-3 py-1 rounded-md text-xs transition-colors ${
+            currentTime === sub.id
+              ? "bg-blue-100 text-blue-700 font-medium"
+              : "text-gray-500 hover:bg-gray-100"
+          }`}
+        >
+          {sub.label}
+        </Link>
+      ))}
+    </div>
   );
 }

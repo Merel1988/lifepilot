@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { MAIN_FOLDERS } from "@/lib/folders";
 import {
   type Item,
@@ -25,7 +26,17 @@ interface TimeSection {
   items: Item[];
 }
 
+const TIME_SECTION_MAP: Record<string, string> = {
+  vandaag: "today",
+  "deze-week": "week",
+  "deze-maand": "month",
+  "dit-jaar": "year",
+  ooit: "later",
+};
+
 export default function TypedItemView({ type, title, description }: TypedItemViewProps) {
+  const searchParams = useSearchParams();
+  const timeFilter = searchParams.get("tijd");
   const [sections, setSections] = useState<TimeSection[]>([]);
   const [completedItems, setCompletedItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,7 +187,10 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
     fetchItems(true);
   }
 
-  const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
+  const visibleSections = timeFilter
+    ? sections.filter((s) => s.id === TIME_SECTION_MAP[timeFilter])
+    : sections;
+  const totalItems = visibleSections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -232,7 +246,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
         </div>
       ) : (
         <div className="space-y-6">
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.id}>
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
                 {section.label}
