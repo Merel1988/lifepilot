@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import Apple from "next-auth/providers/apple";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
@@ -6,7 +6,7 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
-const providers = [Apple, GitHub, Google];
+const providers: NextAuthConfig["providers"] = [Apple, GitHub, Google];
 
 // Only include Microsoft provider if credentials are set
 if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
