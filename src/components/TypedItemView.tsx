@@ -174,6 +174,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
       });
     }
     fetchItems(true);
+    window.dispatchEvent(new CustomEvent("item-moved"));
   }
 
   async function handleDelete(id: string) {
@@ -185,6 +186,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
     setCompletedItems((prev) => prev.filter((i) => i.id !== id));
     await fetch(`/api/items/${id}`, { method: "DELETE" });
     fetchItems(true);
+    window.dispatchEvent(new CustomEvent("item-moved"));
   }
 
   const visibleSections = timeFilter

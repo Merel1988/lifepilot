@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -18,10 +19,33 @@ const TIME_SUBITEMS = [
   { id: "ooit", label: "Ooit" },
 ];
 
+type CountMap = Record<string, Record<string, number>>;
+
 export default function Sidebar({ open, onClose, userName, userImage }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentTime = searchParams.get("tijd");
+  const [counts, setCounts] = useState<CountMap>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/item-counts", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && !cancelled) setCounts(data); })
+      .catch(() => {});
+    // Refresh when items change
+    const handler = () => {
+      fetch("/api/item-counts", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => { if (data) setCounts(data); })
+        .catch(() => {});
+    };
+    window.addEventListener("item-moved", handler);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("item-moved", handler);
+    };
+  }, [pathname]);
 
   return (
     <>
@@ -91,9 +115,13 @@ export default function Sidebar({ open, onClose, userName, userImage }: SidebarP
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               }>Taken</NavLink>
-              {pathname === "/taken" && (
-                <SubItems basePath="/taken" currentTime={currentTime} onClick={onClose} />
-              )}
+              <SubItems
+                basePath="/taken"
+                currentTime={pathname === "/taken" ? currentTime : null}
+                active={pathname === "/taken"}
+                counts={counts.TASK || {}}
+                onClick={onClose}
+              />
 
               {/* Herinneringen */}
               <NavLink href="/herinneringen" pathname={pathname} onClick={onClose} icon={
@@ -101,9 +129,13 @@ export default function Sidebar({ open, onClose, userName, userImage }: SidebarP
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
               }>Herinneringen</NavLink>
-              {pathname === "/herinneringen" && (
-                <SubItems basePath="/herinneringen" currentTime={currentTime} onClick={onClose} />
-              )}
+              <SubItems
+                basePath="/herinneringen"
+                currentTime={pathname === "/herinneringen" ? currentTime : null}
+                active={pathname === "/herinneringen"}
+                counts={counts.REMINDER || {}}
+                onClick={onClose}
+              />
 
               {/* Notities (no time subitems — notes don't have dates) */}
               <NavLink href="/notities" pathname={pathname} onClick={onClose} icon={
@@ -186,37 +218,48 @@ function NavLink({
 function SubItems({
   basePath,
   currentTime,
+  active,
+  counts,
   onClick,
 }: {
   basePath: string;
   currentTime: string | null;
+  active: boolean;
+  counts: Record<string, number>;
   onClick: () => void;
 }) {
+  // Only show subitems with items (count > 0)
+  const visibleSubs = TIME_SUBITEMS.filter((s) => (counts[s.id] || 0) > 0);
+  if (visibleSubs.length === 0) return null;
+
   return (
-    <div className="ml-9 space-y-0.5 mt-0.5 mb-1">
-      <Link
-        href={basePath}
-        onClick={onClick}
-        className={`block px-3 py-1 rounded-md text-xs transition-colors ${
-          !currentTime
-            ? "bg-blue-100 text-blue-700 font-medium"
-            : "text-gray-500 hover:bg-gray-100"
-        }`}
-      >
-        Alles
-      </Link>
-      {TIME_SUBITEMS.map((sub) => (
+    <div className="ml-6 pl-3 border-l border-gray-200 space-y-0.5 mt-1 mb-2">
+      {active && (
         <Link
-          key={sub.id}
-          href={`${basePath}?tijd=${sub.id}`}
+          href={basePath}
           onClick={onClick}
-          className={`block px-3 py-1 rounded-md text-xs transition-colors ${
-            currentTime === sub.id
+          className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+            !currentTime
               ? "bg-blue-100 text-blue-700 font-medium"
               : "text-gray-500 hover:bg-gray-100"
           }`}
         >
-          {sub.label}
+          <span>Alles</span>
+        </Link>
+      )}
+      {visibleSubs.map((sub) => (
+        <Link
+          key={sub.id}
+          href={`${basePath}?tijd=${sub.id}`}
+          onClick={onClick}
+          className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+            active && currentTime === sub.id
+              ? "bg-blue-100 text-blue-700 font-medium"
+              : "text-gray-500 hover:bg-gray-100"
+          }`}
+        >
+          <span>{sub.label}</span>
+          <span className="text-xs text-gray-400 ml-2">{counts[sub.id]}</span>
         </Link>
       ))}
     </div>
