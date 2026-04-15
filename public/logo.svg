@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!-- Background circle — indigo/violet -->
-  <circle cx="256" cy="256" r="256" fill="#6d28d9"/>
+  <!-- Full square background (iOS/macOS will apply its own squircle mask) -->
+  <rect width="512" height="512" fill="#6d28d9"/>
   <!-- Inner glow -->
   <circle cx="256" cy="256" r="220" fill="#8b5cf6" opacity="0.25"/>
   <!-- Compass/arrow pointing up — soft pink/fuchsia -->
