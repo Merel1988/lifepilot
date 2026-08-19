@@ -1,7 +1,5 @@
-"use client";
-
-import { useState } from "react";
-import Sidebar from "./Sidebar";
+import MainNav from "./MainNav";
+import SignOutForm from "./SignOutForm";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -9,36 +7,25 @@ interface AppShellProps {
   userImage?: string | null;
 }
 
+/**
+ * De romp om elke pagina: navigatie plus het scrollende inhoudsvlak.
+ *
+ * Dit is een server component, zodat het uitlog-formulier (een server action)
+ * hier gemaakt kan worden en als slot in de client-side navigatie past. De
+ * `pt-16` en `pb-24` maken op mobiel ruimte voor de vaste kop en de tabbalk.
+ */
 export default function AppShell({ children, userName, userImage }: AppShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+      <MainNav
         userName={userName}
         userImage={userImage}
+        signOutSlot={<SignOutForm />}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          <span className="text-lg font-bold text-gray-900">LifePilot</span>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
-      </div>
+      <main className="flex-1 overflow-y-auto px-4 pt-20 pb-24 sm:px-6 lg:p-6">
+        {children}
+      </main>
     </div>
   );
 }

@@ -2,8 +2,8 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 19 augustus 2026 (v5 — dump-invoer gebouwd)
-**Fase:** bouwen. Ochtendkaart, contacten en de dump-invoer staan er; de vier tabs en het flexibele weekmenu nog niet.
+**Laatst bijgewerkt:** 19 augustus 2026 (v6 — navigatie naar vier ingangen)
+**Fase:** bouwen. Ochtendkaart, contacten, dump-invoer en de vier ingangen staan er. Het flexibele weekmenu is het grote stuk dat nog open is.
 
 ## Aanleiding
 
@@ -40,7 +40,7 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 | Tijdindeling (vandaag/deze week/…) was **vijf keer** geïmplementeerd. Belangrijkste bron van "menu zegt 3, lijst toont 2". | nu `src/lib/day.ts` | Opgelost (v4) — alleen `TypedItemView` rekent nog zelf, maar wel met dezelfde grenzen |
 | Dashboard deed 7 parallelle fetches en filterde client-side. | `Dashboard.tsx` (verwijderd), `src/app/api/today` | Opgelost (v4) |
 | Stille foutafhandeling (`catch {}`) op meerdere plekken: mislukkingen zijn onzichtbaar. | o.a. `api/calendar/[folder]`, `ReminderChecker`, `api/ah-bonus` | Open |
-| Verversen via zelfverzonnen window-event `item-moved`; niets controleert of alle plekken meedoen. | `Sidebar`, `FolderView`, `TypedItemView`, `QuickAdd` | Later |
+| Verversen via zelfverzonnen window-event `item-moved`; niets controleert of alle plekken meedoen. | `MainNav`, `FolderView`, `ItemListView`, `QuickAdd` | Later |
 | Geen tests, ook niet op de tijdindeling (wel randgevallen: achterstallig, herhalend, jaargrens). | `scripts/check-parse.ts` | Deels (v5) — de dump-parser heeft 29 gevallen via `npm run check:parse`; hetzelfde patroon past op `day.ts` |
 | Bijlagen als `Bytes` in Turso (tot 10 MB per bestand). | `prisma/schema.prisma`, `api/attachments` | Later |
 | Geen `userId` op inhoudelijke modellen; alle data gedeeld tussen inloggers. | `prisma/schema.prisma` | Later |
@@ -93,12 +93,21 @@ De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en al
 
 **Opruimwerk** — de Nederlandse dag- en maandnamen plus `formatDayLong`, `formatDayShort` en `relativeDayLabel` staan nu in `src/lib/day.ts`; `TodayView` had zijn eigen kopie en zijn eigen `tomorrow()` en gebruikt nu de gedeelde versie.
 
+## Gebouwd op 19 augustus 2026 (derde sessie)
+
+**Navigatie: van tien ingangen naar vier**
+- `src/components/MainNav.tsx`: Vandaag (`/`), Lijst (`/lijst`), Eten (`/maaltijdplanner`), Zoeken (`/zoeken`). Op mobiel een tabbalk onderaan bij je duim, op desktop een smalle rail links. Op Vandaag staat één badge: het aantal open dingen van vandaag — de enige plek in de app waar een aantal iets betekent.
+- De oude pagina's zijn niet verwijderd maar verhuisd naar een "Meer"-la: contacten, agenda, gewoontes, recepten, en de losse lijsten per type. Zonder die la waren ze alleen nog via de URL te vinden. De tien tijd-subitems in het menu zijn weg; `?tijd=` werkt nog wel als filter.
+- `src/app/lijst/page.tsx` is de nieuwe hoofdlijst: één pagina met álles (taken, herinneringen én notities) gegroepeerd op tijdvak, met de categoriechips erboven. Notities krijgen een eigen sectie onderaan, want die hebben geen datum en zouden anders bij "Ooit" verdwijnen.
+- `TypedItemView` heet nu `ItemListView` en bedient zowel `/lijst` (`type="ALLE"`) als de drie typelijsten. Bij die verhuizing is de laatste eigen tijdberekening eruit gegaan: hij gebruikt nu `bucketFor()` uit `lib/day.ts`, zoals de badges en de ochtendkaart. Daarmee is de "vijf keer geïmplementeerd"-bevinding helemaal afgesloten.
+- `AppShell` is een server component geworden, zodat uitloggen via een server action kan (`SignOutForm`, hetzelfde patroon als inloggen). De oude `Sidebar.tsx` is verwijderd; daarmee is ook die lintfout weg.
+
 ## Bekend en bewust laten liggen
 
-- Twee lintfouten in bestanden die niet bij dit werk horen: `ServiceWorkerRegistration.tsx` (functie gebruikt voor declaratie) en `Sidebar.tsx` (`<a>` naar `/api/auth/signout` in plaats van `<Link>`). De tweede raakt uitloggen, dus niet blind aanpassen.
-- Navigatie is nog de oude zijbalk met tien ingangen. De vier tabs uit de visie zijn de volgende stap.
-- Het dumpveld staat op `/taken`, `/herinneringen` en `/notities`, nog niet op de ochtendkaart. Zodra de tabbalk er is, hoort het dumpen daar thuis (een "+" die het veld focust) in plaats van drie keer los.
-- `FolderView` (`/folder/[folder]`) heeft nog de oude knop met de modal.
+- Nog één lintfout, in een bestand dat niet bij dit werk hoort: `ServiceWorkerRegistration.tsx` (functie gebruikt vóór declaratie). De uitlog-lintfout in `Sidebar.tsx` is weg met de zijbalk zelf.
+- `FolderView` (`/folder/[folder]`) heeft nog de oude knop met de modal en geen dumpveld. Die route staat niet meer in het menu; hij kan waarschijnlijk vervallen zodra de categoriefilter in `/lijst` genoeg blijkt.
+- De navigatie is **niet visueel nagekeken**: alles achter de login zit, dus een browsercheck kan hier niet. Typecheck en build zijn groen, maar kijk zelf of de tabbalk en de vaste kop op je telefoon goed staan.
+- Op de ochtendkaart staat nog geen dumpveld. Nu de tabbalk er is, is de logische volgende stap één "+" in de tabbalk die overal het dumpveld opent, in plaats van drie losse velden op de lijstpagina's.
 - `TypedItemView` en `FolderView` groeperen nog client-side; ze gebruiken wel de gedeelde helpers, dus ze kunnen niet meer afwijken van het menu.
 
 ## Volgorde voor het vervolg
@@ -107,13 +116,14 @@ De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en al
 2. ~~`/api/today`~~ ✅
 3. ~~Vandaag-scherm~~ ✅ — en contacten met verjaardagen erbij
 4. ~~Dump-invoer~~ ✅
-5. **Navigatie terugbrengen** naar vier ingangen; oude pagina's blijven bestaan maar uit het menu.
+5. ~~Navigatie terugbrengen naar vier ingangen~~ ✅
 6. **Weekmenu flexibel maken** — de 7 hardcoded plekken eruit, vaste dagen worden optionele vinkjes met een dagkeuze, `max_tokens` omhoog, raster onthoudt vorige week. Daarna **mealprep-modus**: invoer voor aantal gerechten + porties, en een uitgebreider antwoordformaat met kookmomenten, porties en bewaaradvies.
 7. **iCloud-agenda** aansluiten en de Outlook-publicatielink testen.
 8. Foutmeldingen en bevestigingen overal zichtbaar maken.
 
 ## Sessielog
 
+- **19 aug 2026 (v6)** — Navigatie naar vier ingangen: `MainNav` met tabbalk en rail, "Meer"-la voor de pagina's die uit het menu gingen, nieuwe `/lijst` met alle types op één tijdlijn, `TypedItemView` → `ItemListView` op de gedeelde tijdindeling, `AppShell` als server component met uitloggen via een server action, `Sidebar.tsx` verwijderd. Contacttabel in Turso nagekeken.
 - **19 aug 2026 (v5)** — Dump-invoer gebouwd: Nederlandse parser met 29 regressiegevallen (`npm run check:parse`), `QuickAdd` met zichtbare preview bovenaan de lijsten, categorie-chips, ongedaan maken, en `CreateItemModal` als escape met voorgevulde titel. Dag- en maandnamen naar `day.ts` gehaald.
 - **19 aug 2026 (v4)** — Ochtendkaart gebouwd en gepusht: gedeelde tijdmodule met tijdzone-fix, `/api/today`, server-gerenderd Vandaag-scherm, werkende ochtend-push. Daarna contacten toegevoegd op verzoek: verjaardagen op de kaart en in de push, plus een opt-in "even laten weten"-herinnering. Turso-migratie (`add-contacts.sql`) moet Merel nog draaien.
 - **19 aug 2026 (v3)** — Jannie Meppel = vrijwilligerswerk, dus blijft een categorie zonder extra functies. Weekmenu: aantal dagen wordt per week door Merel gekozen, geen instelling. Werk-to-do's blijven in de app (alleen de werkagenda valt af). Richting staat vast; klaar om te bouwen zodra er groen licht is.

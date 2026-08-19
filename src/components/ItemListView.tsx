@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { MAIN_FOLDERS } from "@/lib/folders";
+import { MAIN_FOLDERS, type ItemType } from "@/lib/folders";
+import { bucketFor, itemDay, localDay } from "@/lib/day";
 import {
   type Item,
   isRecurringToday,
@@ -15,8 +16,9 @@ import CreateItemModal from "./CreateItemModal";
 import QuickAdd from "./QuickAdd";
 import EditItemModal from "./EditItemModal";
 
-interface TypedItemViewProps {
-  type: "TASK" | "REMINDER" | "NOTE";
+interface ItemListViewProps {
+  /** "ALLE" is de lijst uit het menu; de losse types zijn nog los te bekijken. */
+  type: ItemType | "ALLE";
   title: string;
   description: string;
 }
@@ -33,9 +35,10 @@ const TIME_SECTION_MAP: Record<string, string> = {
   "deze-maand": "month",
   "dit-jaar": "year",
   ooit: "later",
+  notities: "notes",
 };
 
-export default function TypedItemView({ type, title, description }: TypedItemViewProps) {
+export default function ItemListView({ type, title, description }: ItemListViewProps) {
   const searchParams = useSearchParams();
   const timeFilter = searchParams.get("tijd");
   const [sections, setSections] = useState<TimeSection[]>([]);
@@ -50,83 +53,70 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
   const fetchItems = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const params = new URLSearchParams({ type, includeRecurring: "true" });
+      const params = new URLSearchParams({ includeRecurring: "true" });
+      if (type !== "ALLE") params.set("type", type);
       if (folderFilter) params.set("folder", folderFilter);
       const res = await fetch(`/api/items?${params}`, { cache: "no-store" });
       const allItems: Item[] = await res.json();
 
-      const todayStr = getTodayDateString();
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
-      const endOfWeek = new Date(today);
-      endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-      endOfWeek.setHours(23, 59, 59, 999);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
-      const endOfYear = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+      const today = getTodayDateString();
 
-      // Separate active vs completed
-      const active = allItems.filter((item) => {
-        if (item.recurring) return !isCompletedForDate(item, todayStr);
-        return !item.completed;
-      });
-      const completed = allItems.filter((item) => {
-        if (item.recurring) return isCompletedForDate(item, todayStr);
-        return item.completed;
-      });
+      // Actief versus afgerond; een herhalend item is "af" per dag
+      const active = allItems.filter((item) =>
+        item.recurring ? !isCompletedForDate(item, today) : !item.completed
+      );
+      const completed = allItems.filter((item) =>
+        item.recurring ? isCompletedForDate(item, today) : item.completed
+      );
 
       if (type === "NOTE") {
-        // Notes don't have time grouping, just show them all
-        const result: TimeSection[] = [];
-        if (active.length > 0) {
-          result.push({ id: "all", label: "Alle notities", items: active });
-        }
-        setSections(result);
+        // Notities hebben geen datum, dus ook geen tijdvakken
+        setSections(active.length > 0 ? [{ id: "notes", label: "Alle notities", items: active }] : []);
         setCompletedItems(completed);
         return;
       }
 
-      // Group by time period
-      const overdue: Item[] = [];
-      const todayItems: Item[] = [];
-      const weekItems: Item[] = [];
-      const monthItems: Item[] = [];
-      const yearItems: Item[] = [];
-      const laterItems: Item[] = [];
+      const buckets: Record<string, Item[]> = {
+        overdue: [],
+        today: [],
+        week: [],
+        month: [],
+        year: [],
+        later: [],
+        notes: [],
+      };
 
+      // De tijdindeling komt uit lib/day.ts, net als de badges en de ochtendkaart
       for (const item of active) {
+        if (item.type === "NOTE") {
+          buckets.notes.push(item);
+          continue;
+        }
+
         if (item.recurring) {
-          if (isRecurringToday(item)) todayItems.push(item);
-          else if (recurringMatchesTimeFolder(item, "deze-week")) weekItems.push(item);
+          if (isRecurringToday(item)) buckets.today.push(item);
+          else if (recurringMatchesTimeFolder(item, "deze-week")) buckets.week.push(item);
           continue;
         }
 
-        if (!item.date) {
-          laterItems.push(item);
-          continue;
-        }
-
-        const d = new Date(item.date);
-        const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-
-        if (itemDate < today) overdue.push(item);
-        else if (itemDate <= todayEnd) todayItems.push(item);
-        else if (itemDate <= endOfWeek) weekItems.push(item);
-        else if (itemDate <= endOfMonth) monthItems.push(item);
-        else if (itemDate <= endOfYear) yearItems.push(item);
-        else laterItems.push(item);
+        buckets[bucketFor(itemDay(item.date), localDay())].push(item);
       }
 
-      const result: TimeSection[] = [];
-      if (overdue.length > 0) result.push({ id: "overdue", label: "Achterstallig", items: overdue });
-      if (todayItems.length > 0) result.push({ id: "today", label: "Vandaag", items: todayItems });
-      if (weekItems.length > 0) result.push({ id: "week", label: "Deze week", items: weekItems });
-      if (monthItems.length > 0) result.push({ id: "month", label: "Deze maand", items: monthItems });
-      if (yearItems.length > 0) result.push({ id: "year", label: "Dit jaar", items: yearItems });
-      if (laterItems.length > 0) result.push({ id: "later", label: "Ooit", items: laterItems });
+      const labels: [string, string][] = [
+        ["overdue", "Achterstallig"],
+        ["today", "Vandaag"],
+        ["week", "Deze week"],
+        ["month", "Deze maand"],
+        ["year", "Dit jaar"],
+        ["later", "Ooit"],
+        ["notes", "Notities"],
+      ];
 
-      setSections(result);
+      setSections(
+        labels
+          .filter(([id]) => buckets[id].length > 0)
+          .map(([id, label]) => ({ id, label, items: buckets[id] }))
+      );
       setCompletedItems(completed);
     } finally {
       setLoading(false);
@@ -162,11 +152,10 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
     }
 
     if (item.recurring) {
-      const todayStr = getTodayDateString();
       await fetch(`/api/items/${id}/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: todayStr }),
+        body: JSON.stringify({ date: getTodayDateString() }),
       });
     } else {
       await fetch(`/api/items/${id}`, {
@@ -203,7 +192,16 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
         <p className="text-gray-500 mt-1">{description}</p>
       </div>
 
-      {/* Folder filter */}
+      {/* Verversen na toevoegen loopt via het item-moved event hierboven */}
+      <QuickAdd
+        defaultType={type === "ALLE" ? undefined : type}
+        onMoreFields={(text) => {
+          setModalTitle(text);
+          setShowCreate(true);
+        }}
+      />
+
+      {/* Categoriefilter */}
       <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
         <button
           onClick={() => setFolderFilter(null)}
@@ -230,22 +228,13 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
         ))}
       </div>
 
-      {/* Verversen na toevoegen loopt via het item-moved event hieronder */}
-      <QuickAdd
-        defaultType={type}
-        onMoreFields={(text) => {
-          setModalTitle(text);
-          setShowCreate(true);
-        }}
-      />
-
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : totalItems === 0 && completedItems.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400">Geen items gevonden</p>
+          <p className="text-gray-400">Nog niets hier — typ het hierboven in.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -310,7 +299,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
           setModalTitle("");
         }}
         onCreated={fetchItems}
-        defaultType={type}
+        defaultType={type === "ALLE" ? "TASK" : type}
         defaultTitle={modalTitle}
       />
 

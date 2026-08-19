@@ -26,8 +26,8 @@ npm run db:generate-sql  # schema.prisma -> schema.sql (volledige CREATE-script)
 Er is geen testrunner geïnstalleerd. `npm run check:parse` is het enige geautomatiseerde
 nazicht: `scripts/check-parse.ts` draait op Node's eigen TypeScript-stripping, met
 `scripts/alias.mjs` als hook voor de `@/`-padalias. Zo kan er een check bij zonder een
-testframework toe te voegen — twee lintfouten in `ServiceWorkerRegistration.tsx` en
-`Sidebar.tsx` staan er nog van vóór dit werk, dus `npm run lint` is nooit helemaal groen.
+testframework toe te voegen — één lintfout in `ServiceWorkerRegistration.tsx` staat er
+nog van vóór dit werk, dus `npm run lint` is nooit helemaal groen.
 
 ## Database (Turso + Prisma driver adapter)
 
@@ -54,7 +54,7 @@ Herhaling is alleen wekelijks: `recurrenceDays` is een komma-string van weekdagn
 
 ## Data flow: server shell, client fetch
 
-Pages in `src/app/**/page.tsx` zijn dunne server components: ze doen `await auth()`, wrappen in `<AppShell>` (sidebar + mobiele header) en renderen één client component in een `Suspense`. Alle data komt daarna client-side uit `/api/*` met `cache: "no-store"`; routes zetten `export const dynamic = "force-dynamic"` en expliciete no-store `Cache-Control` headers (caching heeft hier eerder stale-data bugs veroorzaakt).
+Pages in `src/app/**/page.tsx` zijn dunne server components: ze doen `await auth()`, wrappen in `<AppShell>` (navigatie + inhoudsvlak) en renderen één client component in een `Suspense`. Alle data komt daarna client-side uit `/api/*` met `cache: "no-store"`; routes zetten `export const dynamic = "force-dynamic"` en expliciete no-store `Cache-Control` headers (caching heeft hier eerder stale-data bugs veroorzaakt).
 
 Cross-component refresh loopt via een window-event, niet via router refresh of state lifting:
 
@@ -62,9 +62,18 @@ Cross-component refresh loopt via een window-event, niet via router refresh of s
 window.dispatchEvent(new CustomEvent("item-moved"));
 ```
 
-Sidebar-counts, Dashboard, FolderView en TypedItemView luisteren daarop. Als je een mutatie toevoegt die counts kan veranderen, dispatch dit event.
+`MainNav` (de badge op Vandaag), `ItemListView`, `FolderView` en `QuickAdd` luisteren daarop. Als je een mutatie toevoegt die aantallen kan veranderen, dispatch dit event.
 
-Filters komen uit query params, niet uit routes: `/taken?tijd=deze-week` (en `?tijd=` wordt in de sidebar gelezen met `useSearchParams`).
+Filters komen uit query params, niet uit routes: `/lijst?tijd=deze-week` (gelezen met `useSearchParams`, dus de pagina moet in een `Suspense` staan).
+
+## Navigatie: vier ingangen
+
+`AppShell` is een **server** component (nodig voor de uitlog-server-action in `SignOutForm`) en rendert `MainNav`. Daar staan vier ingangen: Vandaag (`/`), Lijst (`/lijst`), Eten (`/maaltijdplanner`), Zoeken (`/zoeken`) — op mobiel een tabbalk onderaan, op desktop een smalle rail links.
+
+- De rest van de pagina's bestaat nog en is bereikbaar via de "Meer"-la in `MainNav` (`/contacten`, `/agenda`, `/habits`, `/recepten`) of via de losse typelijsten (`/taken`, `/herinneringen`, `/notities`). Voeg géén vijfde ingang toe zonder dat te bespreken; het punt van het herontwerp was minder keuzes.
+- `owns` per ingang bepaalt welke ingang oplicht op een pagina die zelf geen tab is (`/contacten` licht Vandaag op).
+- De kop en de tabbalk op mobiel staan `fixed`; `AppShell` compenseert dat met `pt-20 pb-24` en zet die op `lg` weer uit. Als je iets aan de hoogte verandert, verander beide.
+- `ItemListView` is één component voor `/lijst` (`type="ALLE"`) en de losse typelijsten. In `ALLE`-modus krijgen notities een eigen sectie onderaan, want die hebben geen datum.
 
 ## Invoeren: één tekstveld met natuurlijke taal
 
