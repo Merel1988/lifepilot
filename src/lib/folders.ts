@@ -1,3 +1,5 @@
+import { bucketFor, itemDay, localDay } from "@/lib/day";
+
 export type MainFolder = "PRIVE" | "WERK" | "JANNIE_MEPPEL";
 export type ItemType = "TASK" | "REMINDER" | "NOTE";
 export type TimeFolder =
@@ -29,45 +31,35 @@ export const ITEM_TYPES: { id: ItemType; label: string }[] = [
   { id: "NOTE", label: "Notitie" },
 ];
 
+/**
+ * De categorie die standaard aan staat bij een nieuw item.
+ *
+ * Hier stond eerder een gok op basis van de klok: ma–do tussen 08:00 en 16:00
+ * werd automatisch WERK. Dat labelde privé-items stil verkeerd zonder dat je
+ * het zag. Liever geen gok dan een onzichtbaar verkeerde gok — je kiest zelf.
+ */
 export function getDefaultFolder(): MainFolder {
-  const now = new Date();
-  const day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  const hour = now.getHours();
-
-  // Mon(1) - Thu(4), 08:00 - 16:00 → WERK
-  if (day >= 1 && day <= 4 && hour >= 8 && hour < 16) {
-    return "WERK";
-  }
   return "PRIVE";
 }
 
+/** In welke tijdmap valt dit item? Eén implementatie, in lib/day.ts. */
 export function getTimeFolderForDate(date: Date | null, type: string): TimeFolder {
   if (type === "NOTE") return "notities";
-  if (!date) return "ooit";
 
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const bucket = bucketFor(itemDay(date), localDay());
 
-  // Vandaag
-  if (itemDate.getTime() === today.getTime()) return "vandaag";
-
-  // Deze week (remaining days of current week)
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
-  if (itemDate <= endOfWeek && itemDate > today) return "deze-week";
-
-  // Deze maand
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  if (itemDate <= endOfMonth && itemDate > today) return "deze-maand";
-
-  // Dit jaar
-  const endOfYear = new Date(today.getFullYear(), 11, 31);
-  if (itemDate <= endOfYear && itemDate > today) return "dit-jaar";
-
-  // Past dates go to vandaag (overdue)
-  if (itemDate < today) return "vandaag";
-
-  // More than a year in the future
-  return "ooit";
+  switch (bucket) {
+    // Wat te laat is hoort bij vandaag, want daar moet je iets mee
+    case "overdue":
+    case "today":
+      return "vandaag";
+    case "week":
+      return "deze-week";
+    case "month":
+      return "deze-maand";
+    case "year":
+      return "dit-jaar";
+    default:
+      return "ooit";
+  }
 }

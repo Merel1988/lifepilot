@@ -1,10 +1,22 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 import webpush from "web-push";
+import { localDay, localTime } from "@/lib/day";
+import { getTodayCard, summaryLine } from "@/lib/today";
 
-// Called by Vercel Cron (GET) to check for due reminders and send push notifications
+/**
+ * Twee soorten meldingen, allebei via deze route.
+ *
+ * Standaard (geen `mode`): de ochtendkaart. Eén melding per dag met wat er
+ * vandaag is. Dit past bij het gratis Vercel-plan, dat één geplande taak per
+ * dag toestaat — zie de cron in vercel.json.
+ *
+ * `?mode=due`: herinneringen die in de komende vijf minuten aan de beurt zijn.
+ * Dat werkt alleen als iets deze route ook elke vijf minuten aanroept. Op het
+ * gratis plan kan dat niet met een cron; een externe pinger of een betaald plan
+ * is daarvoor nodig. De route staat er klaar voor.
+ */
 export async function GET(request: NextRequest) {
-  // Vercel Cron sends Authorization: Bearer <CRON_SECRET>
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
@@ -19,45 +31,92 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: "VAPID keys not configured" }, { status: 500 });
   }
 
-  webpush.setVapidDetails(
-    "mailto:noreply@lifepilot.app",
-    vapidPublic,
-    vapidPrivate
-  );
+  webpush.setVapidDetails("mailto:noreply@lifepilot.app", vapidPublic, vapidPrivate);
 
-  // Find reminders due in the next 5 minutes
+  const mode = request.nextUrl.searchParams.get("mode");
+
+  try {
+    const notifications =
+      mode === "due" ? await dueReminders() : await morningCard();
+
+    if (notifications.length === 0) {
+      return Response.json({ sent: 0, notifications: 0 });
+    }
+
+    const sent = await deliver(notifications);
+    return Response.json({ sent, notifications: notifications.length });
+  } catch (error) {
+    console.error("Push versturen mislukte:", error);
+    return Response.json(
+      { error: "Push versturen mislukte." },
+      { status: 500 }
+    );
+  }
+}
+
+interface Notification {
+  title: string;
+  body: string;
+  tag: string;
+  url: string;
+}
+
+/** De ochtendkaart als één melding. Stuurt niets op een lege dag. */
+async function morningCard(): Promise<Notification[]> {
+  const card = await getTodayCard();
+
+  const hasSomething =
+    card.timeline.length > 0 || card.untimed.length > 0 || card.overdue.length > 0;
+  if (!hasSomething) return [];
+
+  const first = card.timeline.find((entry) => entry.time);
+  const extra = first ? ` Eerst: ${first.time} ${first.title}.` : "";
+
+  return [
+    {
+      title: "Vandaag",
+      body: `${summaryLine(card)}.${extra}`,
+      tag: `ochtendkaart-${card.day}`,
+      url: "/",
+    },
+  ];
+}
+
+/** Herinneringen die binnen vijf minuten aan de beurt zijn. */
+async function dueReminders(): Promise<Notification[]> {
   const now = new Date();
-  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const fiveMinLater = new Date(now.getTime() + 5 * 60 * 1000);
-  const laterTime = `${String(fiveMinLater.getHours()).padStart(2, "0")}:${String(fiveMinLater.getMinutes()).padStart(2, "0")}`;
+  const day = localDay(now);
+  const from = localTime(now);
+  const to = localTime(new Date(now.getTime() + 5 * 60 * 1000));
 
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const todayEnd = new Date(todayStart);
-  todayEnd.setHours(23, 59, 59, 999);
+  const dayStart = new Date(`${day}T00:00:00.000Z`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
 
   const reminders = await prisma.item.findMany({
     where: {
       type: "REMINDER",
       completed: false,
-      time: { gte: currentTime, lte: laterTime },
-      date: { gte: todayStart, lte: todayEnd },
+      time: { gte: from, lte: to },
+      date: { gte: dayStart, lte: dayEnd },
     },
+    select: { id: true, title: true, description: true, time: true },
   });
 
-  if (reminders.length === 0) {
-    return Response.json({ sent: 0 });
-  }
+  return reminders.map((reminder) => ({
+    title: reminder.title,
+    body: reminder.description || `Herinnering om ${reminder.time}`,
+    tag: `reminder-${reminder.id}`,
+    url: "/",
+  }));
+}
 
+/** Verstuurt naar alle abonnementen en ruimt verlopen abonnementen op. */
+async function deliver(notifications: Notification[]): Promise<number> {
   const subscriptions = await prisma.pushSubscription.findMany();
   let sent = 0;
 
-  for (const reminder of reminders) {
-    const payload = JSON.stringify({
-      title: reminder.title,
-      body: reminder.description || `Herinnering: ${reminder.title}`,
-      tag: `reminder-${reminder.id}`,
-      url: "/",
-    });
+  for (const notification of notifications) {
+    const payload = JSON.stringify(notification);
 
     for (const sub of subscriptions) {
       try {
@@ -70,13 +129,20 @@ export async function GET(request: NextRequest) {
         );
         sent++;
       } catch (error: unknown) {
-        // Remove invalid subscriptions (410 Gone)
-        if (error && typeof error === "object" && "statusCode" in error && (error as { statusCode: number }).statusCode === 410) {
+        const statusCode =
+          error && typeof error === "object" && "statusCode" in error
+            ? (error as { statusCode: number }).statusCode
+            : 0;
+
+        // 410 Gone en 404 betekenen: dit abonnement bestaat niet meer
+        if (statusCode === 410 || statusCode === 404) {
           await prisma.pushSubscription.delete({ where: { id: sub.id } });
+        } else {
+          console.error(`Push naar ${sub.endpoint.slice(0, 40)}… mislukte:`, error);
         }
       }
     }
   }
 
-  return Response.json({ sent, reminders: reminders.length });
+  return sent;
 }

@@ -1,3 +1,11 @@
+import {
+  completedOnDay,
+  localDay,
+  localWeekday,
+  parseWeekdays,
+  recursOnWeekday,
+} from "@/lib/day";
+
 export interface RecurrenceCompletion {
   id: string;
   itemId: string;
@@ -37,54 +45,52 @@ const DAY_LABELS: Record<number, string> = {
 };
 
 export function formatRecurrenceDays(days: string): string {
-  const dayNumbers = days.split(",").map(Number).sort();
-  return dayNumbers.map((d) => DAY_LABELS[d] || d).join(", ");
+  return parseWeekdays(days)
+    .sort()
+    .map((d) => DAY_LABELS[d] ?? d)
+    .join(", ");
 }
 
 export function isRecurringToday(item: Item): boolean {
-  if (!item.recurring || !item.recurrenceDays) return false;
-  const today = new Date().getDay();
-  return item.recurrenceDays.split(",").map(Number).includes(today);
+  if (!item.recurring) return false;
+  return recursOnWeekday(item.recurrenceDays, localWeekday());
 }
 
 export function isCompletedForDate(item: Item, date: string): boolean {
-  return item.completions?.some((c) => c.date === date) ?? false;
+  return completedOnDay(item.completions, date);
 }
 
 /**
- * Check if a recurring item should appear in a given time folder.
- * - vandaag: if today is a recurrence day
- * - deze-week: if any recurrence day falls in the remaining days of this week (excluding today)
- * - deze-maand / dit-jaar: always (weekly recurring items always occur within a month)
- * - ooit / notities: never
+ * Hoort een herhalend item in dit tijdvak?
+ * - vandaag: als vandaag een herhaaldag is
+ * - deze week: als er nog een herhaaldag komt in de rest van deze week
+ * - deze maand / dit jaar: altijd, want wekelijks valt daar altijd binnen
+ * - ooit / notities: nooit
  */
 export function recurringMatchesTimeFolder(item: Item, timeFolder: string): boolean {
-  if (!item.recurring || !item.recurrenceDays) return false;
-  const days = item.recurrenceDays.split(",").map(Number);
-  const today = new Date().getDay();
+  if (!item.recurring) return false;
+  const days = parseWeekdays(item.recurrenceDays);
+  if (days.length === 0) return false;
+  const today = localWeekday();
 
   switch (timeFolder) {
     case "vandaag":
       return days.includes(today);
     case "deze-week": {
-      // Remaining days of the week after today (Sun=0 is end of week)
-      const endOfWeekDay = 6; // Saturday
-      for (let d = today + 1; d <= endOfWeekDay; d++) {
+      for (let d = today + 1; d <= 6; d++) {
         if (days.includes(d)) return true;
       }
-      // Also check Sunday (0) if today isn't Sunday
-      if (today !== 0 && days.includes(0)) return true;
-      return false;
+      // Zondag (0) sluit de week af, dus die telt nog mee
+      return today !== 0 && days.includes(0);
     }
     case "deze-maand":
     case "dit-jaar":
-      return true; // A weekly recurring item will always occur
+      return true;
     default:
       return false;
   }
 }
 
 export function getTodayDateString(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return localDay();
 }
