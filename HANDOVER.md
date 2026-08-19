@@ -57,13 +57,10 @@ Alle grote vragen zijn beantwoord. Wat resteert is klein genoeg om onderweg te b
 
 ## ⚠️ Nog te doen door Merel
 
-De contacttabel bestaat in `prisma/schema.prisma` maar **nog niet in Turso**. Zolang dat niet is gedaan, geeft `/contacten` en de ochtendkaart een fout. Eén commando:
+De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en alle dertien kolommen kloppen met het model). Wat resteert:
 
-```bash
-turso db shell lifepilot < add-contacts.sql
-```
-
-Daarna: iCloud-agenda koppelen via `/agenda` (Agenda op de Mac → rechtsklik agenda → Delen → Openbare agenda → `webcal://`-link kopiëren), anders blijven de afspraken op de ochtendkaart leeg.
+- **iCloud-agenda koppelen** via `/agenda` (Agenda op de Mac → rechtsklik agenda → Delen → Openbare agenda → `webcal://`-link kopiëren). Zonder feed blijft de tijdlijn op de ochtendkaart leeg, en dat is juist het idee van dat scherm.
+- **Contacten invoeren** op `/contacten`; zonder rijen blijven de secties "Verjaardagen" en "Even laten weten" weg.
 
 ## Gebouwd op 19 augustus 2026
 
