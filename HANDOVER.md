@@ -2,7 +2,7 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 19 augustus 2026 (v2)
+**Laatst bijgewerkt:** 19 augustus 2026 (v3 — richting staat vast)
 **Fase:** denkfase / productvisie. Er is nog **geen** functionele code gewijzigd.
 
 ## Aanleiding
@@ -24,9 +24,9 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 - **Werkagenda (Microsoft 365) valt af.** Merel verwacht geen toestemming van IT. De ochtendkaart gaat dus over "wat staat er vandaag *naast* je werk". Nog wel te proberen: de "agenda publiceren"-functie in Outlook web (Instellingen → Agenda → Gedeelde agenda's), die een ICS-link geeft zonder IT.
 - **iCloud-agenda is de agenda die het moet worden**, via een openbare `webcal://`-deellink. De bestaande ICS-parser kan dit al aan.
 - **De indeling Privé / Werk / Jannie Meppel moet anders.** Mappen worden optionele labels: geen verplichte keuze bij invoeren, geen menu-items, blijven bestaan als filter in zoeken.
-- **Jannie Meppel is een bedrijfje** waar Merel naast haar werk af en toe klussen voor doet. Jannie Meppel heeft nergens anders een systeem, dus daar is de app de enige plek; loondienst-werk heeft dat wel (Outlook, mail) en wordt aangevuld, niet vervangen. Open vraag: houdt ze uren/facturen bij voor Jannie Meppel? Zo ja, dan is het geen categorie maar een eigen functie en een derde reden om de app te openen.
+- **Jannie Meppel is een bedrijfje** waar Merel naast haar werk af en toe klussen voor doet. Jannie Meppel heeft nergens anders een systeem, dus daar is de app de enige plek; loondienst-werk heeft dat wel (Outlook, mail) en wordt aangevuld, niet vervangen. **Beslist:** het is vrijwilligerswerk, geen uren of facturen. Dus gewoon een categorie, geen eigen module.
 - **Alle drie de categorieën blijven** — Merel wil ook werk-to-do's in de app. Let op het onderscheid: de werk*agenda* valt af (Microsoft), werk*taken* niet. Wat verandert: geen drie menupagina's meer (wordt een filter bovenaan de lijst: Alles · Privé · Werk · Jannie), geen dropdown in een formulier (wordt drie chips onder het invoerveld, optioneel, plus een voorstel op basis van de tekst), en **de tijdgok verdwijnt** — `getDefaultFolder()` zet nu ma–do 08:00–16:00 stil alles op WERK, wat privé-items onzichtbaar verkeerd labelt. Op de ochtendkaart een klein categoriemerkje per regel.
-- **Het weekmenu moet losser.** Frietjes op vrijdag en restjes op donderdag zijn gewoontes, geen wetten: niet elke week, en restjes niet altijd op donderdag. Merel wil per week aangeven welke dagen ze maaltijden nodig heeft, en wil (leren) mealpreppen — dus minder verschillende gerechten voor meer dagen.
+- **Het weekmenu moet losser.** Frietjes op vrijdag en restjes op donderdag zijn gewoontes, geen wetten: niet elke week, en restjes niet altijd op donderdag. **Beslist:** Merel bepaalt per week zelf hoeveel/welke avonden ze een menu wil — geen vaste instelling en geen aanname. Het gekozen aantal is meteen de noemer voor mealprep ("3 gerechten voor 5 avonden"). Ze wil (leren) mealpreppen: minder verschillende gerechten voor meer dagen, met porties, kookmomenten, bewaaradvies en variatie binnen hetzelfde gerecht.
 - **Nu single-user**, later misschien haar partner erbij. Geen voorbereidend werk daarvoor, wel geen keuzes maken die het blokkeren.
 
 ## Bevindingen in de code (nagetrokken, niet gerepareerd)
@@ -48,11 +48,11 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 
 ## Openstaande vragen aan Merel
 
-1. Houdt Merel uren/facturen bij voor Jannie Meppel? (Bepaalt: label of eigen functie.)
-2. Weekmenu per week of per 2–3 dagen? (Met mealprep is korter soms logischer.)
-3. Mag de app zeuren over de dumplijst ("5 dingen zonder datum")?
-4. Klopt "naast je werk" als gebied van de app?
-5. Beginnen bij de ochtendkaart of bij de dump? (Advies: ochtendkaart.)
+Alle grote vragen zijn beantwoord. Wat resteert is klein genoeg om onderweg te beslissen:
+
+1. Mag de app zeuren over de dumplijst ("5 dingen zonder datum")?
+2. Beginnen bij de ochtendkaart of bij de dump? (Advies: ochtendkaart — makkelijk invoeren helpt niet zolang je nog aan de app moet denken.)
+3. Nog te testen: staat "agenda publiceren" aan in Outlook web? Zo ja, dan kan de werkagenda er alsnog in.
 
 ## Volgorde als er groen licht is
 
@@ -67,5 +67,6 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 
 ## Sessielog
 
+- **19 aug 2026 (v3)** — Jannie Meppel = vrijwilligerswerk, dus blijft een categorie zonder extra functies. Weekmenu: aantal dagen wordt per week door Merel gekozen, geen instelling. Werk-to-do's blijven in de app (alleen de werkagenda valt af). Richting staat vast; klaar om te bouwen zodra er groen licht is.
 - **19 aug 2026 (v2)** — Jannie Meppel blijkt een bedrijfje (bijklus), niet een persoon om voor te zorgen: wordt het belangrijkste label, Werk het minst belangrijke. Weekmenu-eisen bijgesteld (flexibele dagen, mealprep). Bij het nakijken bleek de server het dagenraster te overschrijven en is de credits-hypothese vervangen door `max_tokens`. Visie-artifact bijgewerkt naar v2.
 - **19 aug 2026** — `CLAUDE.md` geschreven (architectuur, commands, Turso/Prisma-eigenaardigheden). Gesprek over richting, codereview, productvisie opgesteld en als artifact gepubliceerd. `HANDOVER.md` aangemaakt. Geen functionele wijzigingen.
