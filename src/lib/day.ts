@@ -140,3 +140,51 @@ export function habitDueOnWeekday(
       return false;
   }
 }
+
+export const WEEKDAY_NAMES = [
+  "zondag",
+  "maandag",
+  "dinsdag",
+  "woensdag",
+  "donderdag",
+  "vrijdag",
+  "zaterdag",
+];
+
+export const MONTH_NAMES = [
+  "januari",
+  "februari",
+  "maart",
+  "april",
+  "mei",
+  "juni",
+  "juli",
+  "augustus",
+  "september",
+  "oktober",
+  "november",
+  "december",
+];
+
+/** "woensdag 19 augustus" */
+export function formatDayLong(day: string): string {
+  const d = dayToUTC(day);
+  return `${WEEKDAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}`;
+}
+
+/** "wo 19 aug" */
+export function formatDayShort(day: string): string {
+  const d = dayToUTC(day);
+  return `${WEEKDAY_NAMES[d.getUTCDay()].slice(0, 2)} ${d.getUTCDate()} ${MONTH_NAMES[
+    d.getUTCMonth()
+  ].slice(0, 3)}`;
+}
+
+/** "vandaag" / "morgen" / "gisteren", en anders "wo 19 aug". */
+export function relativeDayLabel(day: string, today: string = localDay()): string {
+  if (day === today) return "vandaag";
+  if (day === addDays(today, 1)) return "morgen";
+  if (day === addDays(today, 2)) return "overmorgen";
+  if (day === addDays(today, -1)) return "gisteren";
+  return formatDayShort(day);
+}

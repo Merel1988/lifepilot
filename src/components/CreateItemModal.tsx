@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MAIN_FOLDERS, ITEM_TYPES, getDefaultFolder, type MainFolder, type ItemType } from "@/lib/folders";
 import RichTextEditor from "./RichTextEditor";
 
@@ -19,9 +19,11 @@ interface CreateItemModalProps {
   onClose: () => void;
   onCreated: () => void;
   defaultType?: ItemType;
+  /** Voorgevulde titel, bijvoorbeeld de tekst uit het dumpveld. */
+  defaultTitle?: string;
 }
 
-export default function CreateItemModal({ open, onClose, onCreated, defaultType }: CreateItemModalProps) {
+export default function CreateItemModal({ open, onClose, onCreated, defaultType, defaultTitle }: CreateItemModalProps) {
   const today = new Date().toISOString().split("T")[0];
   const [title, setTitle] = useState("");
   const [type, setType] = useState<ItemType>(defaultType || "TASK");
@@ -34,6 +36,11 @@ export default function CreateItemModal({ open, onClose, onCreated, defaultType 
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attachments, setAttachments] = useState<{ id: string; filename: string; mimeType: string; size: number }[]>([]);
+
+  // De modal blijft gemonteerd, dus de titel komt bij het openen binnen
+  useEffect(() => {
+    if (open) setTitle(defaultTitle ?? "");
+  }, [open, defaultTitle]);
 
   function reset() {
     setTitle("");

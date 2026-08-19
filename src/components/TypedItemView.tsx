@@ -12,6 +12,7 @@ import {
 } from "@/lib/types";
 import ItemCard from "./ItemCard";
 import CreateItemModal from "./CreateItemModal";
+import QuickAdd from "./QuickAdd";
 import EditItemModal from "./EditItemModal";
 
 interface TypedItemViewProps {
@@ -42,6 +43,7 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
   const [loading, setLoading] = useState(true);
   const [folderFilter, setFolderFilter] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -228,15 +230,14 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
         ))}
       </div>
 
-      <button
-        onClick={() => setShowCreate(true)}
-        className="w-full mb-6 flex items-center justify-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-2xl hover:bg-violet-700 transition-colors shadow-lg shadow-violet-600/20 font-medium text-sm"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-        Nieuw item
-      </button>
+      {/* Verversen na toevoegen loopt via het item-moved event hieronder */}
+      <QuickAdd
+        defaultType={type}
+        onMoreFields={(text) => {
+          setModalTitle(text);
+          setShowCreate(true);
+        }}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -304,9 +305,13 @@ export default function TypedItemView({ type, title, description }: TypedItemVie
 
       <CreateItemModal
         open={showCreate}
-        onClose={() => setShowCreate(false)}
+        onClose={() => {
+          setShowCreate(false);
+          setModalTitle("");
+        }}
         onCreated={fetchItems}
         defaultType={type}
+        defaultTitle={modalTitle}
       />
 
       <EditItemModal

@@ -4,36 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { CheckEntry, TodayCard, TimelineEntry } from "@/lib/today";
 import { birthdayLine } from "@/lib/contacts";
-
-const WEEKDAY_NAMES = [
-  "zondag",
-  "maandag",
-  "dinsdag",
-  "woensdag",
-  "donderdag",
-  "vrijdag",
-  "zaterdag",
-];
-
-const MONTH_NAMES = [
-  "januari",
-  "februari",
-  "maart",
-  "april",
-  "mei",
-  "juni",
-  "juli",
-  "augustus",
-  "september",
-  "oktober",
-  "november",
-  "december",
-];
-
-function formatDay(day: string): string {
-  const d = new Date(`${day}T00:00:00.000Z`);
-  return `${WEEKDAY_NAMES[d.getUTCDay()]} ${d.getUTCDate()} ${MONTH_NAMES[d.getUTCMonth()]}`;
-}
+import { addDays, formatDayLong } from "@/lib/day";
 
 function summaryLine(card: TodayCard): string {
   const parts: string[] = [];
@@ -52,13 +23,6 @@ function summaryLine(card: TodayCard): string {
   if (card.summary.meal) parts.push(card.summary.meal.toLowerCase());
   if (parts.length === 0) return "Niks vandaag — fijn";
   return parts.join(" · ");
-}
-
-/** Voegt "morgen" toe aan een YYYY-MM-DD zonder tijdzone-gedoe. */
-function tomorrow(day: string): string {
-  const d = new Date(`${day}T00:00:00.000Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
 }
 
 export default function TodayView({ initial }: { initial: TodayCard }) {
@@ -127,7 +91,7 @@ export default function TodayView({ initial }: { initial: TodayCard }) {
       const res = await fetch(`/api/items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: tomorrow(card.day) }),
+        body: JSON.stringify({ date: addDays(card.day, 1) }),
       });
       if (!res.ok) throw new Error(String(res.status));
       setNotice(`"${title}" staat nu op morgen.`);
@@ -165,7 +129,7 @@ export default function TodayView({ initial }: { initial: TodayCard }) {
     <div className="max-w-2xl mx-auto space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold text-gray-900 first-letter:uppercase">
-          {formatDay(card.day)}
+          {formatDayLong(card.day)}
         </h1>
         <p className="text-gray-500">{summaryLine(card)}</p>
       </header>

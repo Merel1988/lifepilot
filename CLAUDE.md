@@ -19,10 +19,15 @@ npm run dev              # next dev (praat met de echte Turso-database, zie hier
 npm run build            # prisma generate && next build
 npm run lint             # eslint (flat config)
 npx tsc --noEmit         # typecheck
+npm run check:parse      # regressiegevallen van de dump-parser (zie hieronder)
 npm run db:generate-sql  # schema.prisma -> schema.sql (volledige CREATE-script)
 ```
 
-Er is geen testsuite en geen testrunner geïnstalleerd.
+Er is geen testrunner geïnstalleerd. `npm run check:parse` is het enige geautomatiseerde
+nazicht: `scripts/check-parse.ts` draait op Node's eigen TypeScript-stripping, met
+`scripts/alias.mjs` als hook voor de `@/`-padalias. Zo kan er een check bij zonder een
+testframework toe te voegen — twee lintfouten in `ServiceWorkerRegistration.tsx` en
+`Sidebar.tsx` staan er nog van vóór dit werk, dus `npm run lint` is nooit helemaal groen.
 
 ## Database (Turso + Prisma driver adapter)
 
@@ -41,11 +46,9 @@ Er is geen testsuite en geen testrunner geïnstalleerd.
 
 Taken, herinneringen en notities zijn allemaal `Item` met `type` (`TASK` | `REMINDER` | `NOTE`) en `folder` (`PRIVE` | `WERK` | `JANNIE_MEPPEL`).
 
-De "tijdmappen" (`vandaag`, `deze-week`, `deze-maand`, `dit-jaar`, `ooit`, `notities`) staan **niet** in de database — ze worden bij elke render uit `item.date` berekend. Die bucket-logica bestaat op vier plekken die je synchroon moet houden bij wijzigingen:
-- `src/lib/folders.ts` (`getTimeFolderForDate`, `getDefaultFolder` — kiest WERK ma–do 08:00–16:00)
-- `src/lib/types.ts` (`recurringMatchesTimeFolder`, `isRecurringToday`, `isCompletedForDate`)
-- `src/components/TypedItemView.tsx` en `src/components/Dashboard.tsx` (client-side groepering)
-- `src/app/api/item-counts/route.ts` (de badges in de sidebar)
+De "tijdmappen" (`vandaag`, `deze-week`, `deze-maand`, `dit-jaar`, `ooit`, `notities`) staan **niet** in de database — ze worden bij elke render uit `item.date` berekend. Die logica hoort op één plek: **`src/lib/day.ts`**. Daar staat welke dag het is (in `Europe/Amsterdam`, niet de UTC-klok van de server), in welk tijdvak een datum valt (`bucketFor`), het rekenen met `"YYYY-MM-DD"`-strings, en de Nederlandse dag- en maandnamen met hun formatters.
+
+Wie erop leunt: `src/lib/folders.ts` (`getTimeFolderForDate`), `src/lib/types.ts` (herhaling en afvinken), `src/lib/today.ts` + `src/components/TodayView.tsx` (de ochtendkaart), `src/app/api/item-counts/route.ts` (de badges) en `src/components/TypedItemView.tsx` (client-side groepering, met een eigen `Date`-berekening die nog naar `day.ts` toe moet). Voeg geen tweede implementatie toe — "menu zegt 3, lijst toont 2" kwam hiervandaan.
 
 Herhaling is alleen wekelijks: `recurrenceDays` is een komma-string van weekdagnummers (0=zo). Een herhalend item wordt nooit `completed`; afvinken maakt/verwijdert een `RecurrenceCompletion` voor die dag via `POST /api/items/[id]/complete`.
 
@@ -62,6 +65,15 @@ window.dispatchEvent(new CustomEvent("item-moved"));
 Sidebar-counts, Dashboard, FolderView en TypedItemView luisteren daarop. Als je een mutatie toevoegt die counts kan veranderen, dispatch dit event.
 
 Filters komen uit query params, niet uit routes: `/taken?tijd=deze-week` (en `?tijd=` wordt in de sidebar gelezen met `useSearchParams`).
+
+## Invoeren: één tekstveld met natuurlijke taal
+
+`src/components/QuickAdd.tsx` staat bovenaan elke lijst en is de normale manier om iets toe te voegen: je typt `morgen 9u tandarts`, `src/lib/parse-input.ts` maakt daar een herinnering voor morgen 09:00 van met de titel "Tandarts", en de preview eronder toont wát er gemaakt wordt vóór je opslaat. Dat is de kern van het ontwerp: de parser gokt, maar nooit stil.
+
+- De parser is puur en tijdzone-vrij testbaar: `parseQuickInput(text, { today, defaultType })`. Voeg bij elke nieuwe formulering een geval toe in `scripts/check-parse.ts`.
+- Datum, tijd en categorie zijn in de preview te overschrijven; `CreateItemModal` blijft als escape via "Meer velden" (met de getypte tekst als titel).
+- Type volgt uit de tekst: een tijd maakt het een `REMINDER` (alleen die kan een melding sturen), `notitie:` maakt het een `NOTE`, anders het type van de lijst waar je staat.
+- Een categorie wordt alleen uit *woorden* geraden (`#werk`, "jannie", "vergadering"), nooit uit de klok. Die klokgok stond eerder in `getDefaultFolder()` en labelde privé-items onzichtbaar als WERK.
 
 ## Integraties
 
