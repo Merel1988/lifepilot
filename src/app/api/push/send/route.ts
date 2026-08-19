@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import webpush from "web-push";
 import { localDay, localTime } from "@/lib/day";
 import { getTodayCard, summaryLine } from "@/lib/today";
+import { birthdayLine } from "@/lib/contacts";
 
 /**
  * Twee soorten meldingen, allebei via deze route.
@@ -66,20 +67,38 @@ async function morningCard(): Promise<Notification[]> {
   const card = await getTodayCard();
 
   const hasSomething =
-    card.timeline.length > 0 || card.untimed.length > 0 || card.overdue.length > 0;
+    card.timeline.length > 0 ||
+    card.untimed.length > 0 ||
+    card.overdue.length > 0 ||
+    card.birthdays.length > 0 ||
+    card.keepInTouch.length > 0;
   if (!hasSomething) return [];
+
+  const notifications: Notification[] = [];
+
+  // Een verjaardag krijgt zijn eigen melding: dit is precies het ding dat je
+  // niet wil missen, en het verdrinkt in een samenvattingsregel.
+  const jarig = card.birthdays.filter((entry) => entry.inDays === 0);
+  if (jarig.length > 0) {
+    notifications.push({
+      title: jarig.length === 1 ? "Iemand is jarig" : `${jarig.length} jarigen vandaag`,
+      body: jarig.map(birthdayLine).join(" · "),
+      tag: `verjaardag-${card.day}`,
+      url: "/contacten",
+    });
+  }
 
   const first = card.timeline.find((entry) => entry.time);
   const extra = first ? ` Eerst: ${first.time} ${first.title}.` : "";
 
-  return [
-    {
-      title: "Vandaag",
-      body: `${summaryLine(card)}.${extra}`,
-      tag: `ochtendkaart-${card.day}`,
-      url: "/",
-    },
-  ];
+  notifications.push({
+    title: "Vandaag",
+    body: `${summaryLine(card)}.${extra}`,
+    tag: `ochtendkaart-${card.day}`,
+    url: "/",
+  });
+
+  return notifications;
 }
 
 /** Herinneringen die binnen vijf minuten aan de beurt zijn. */

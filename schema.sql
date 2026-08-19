@@ -94,6 +94,9 @@ CREATE TABLE "Recipe" (
     "category" TEXT NOT NULL DEFAULT 'AVONDETEN',
     "ingredients" TEXT,
     "description" TEXT,
+    "servings" INTEGER NOT NULL DEFAULT 4,
+    "favorite" BOOLEAN NOT NULL DEFAULT false,
+    "sourceUrl" TEXT,
     "source" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -131,6 +134,23 @@ CREATE TABLE "CalendarFeed" (
 );
 
 -- CreateTable
+CREATE TABLE "Contact" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "phone" TEXT,
+    "email" TEXT,
+    "address" TEXT,
+    "birthDay" INTEGER,
+    "birthMonth" INTEGER,
+    "birthYear" INTEGER,
+    "notes" TEXT,
+    "keepInTouchWeeks" INTEGER,
+    "lastContactAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
 CREATE TABLE "PushSubscription" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "endpoint" TEXT NOT NULL,
@@ -153,6 +173,9 @@ CREATE UNIQUE INDEX "RecurrenceCompletion_itemId_date_key" ON "RecurrenceComplet
 
 -- CreateIndex
 CREATE UNIQUE INDEX "HabitCompletion_habitId_date_key" ON "HabitCompletion"("habitId", "date");
+
+-- CreateIndex
+CREATE INDEX "Contact_birthMonth_birthDay_idx" ON "Contact"("birthMonth", "birthDay");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PushSubscription_endpoint_key" ON "PushSubscription"("endpoint");

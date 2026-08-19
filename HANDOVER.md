@@ -2,8 +2,8 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 19 augustus 2026 (v3 — richting staat vast)
-**Fase:** denkfase / productvisie. Er is nog **geen** functionele code gewijzigd.
+**Laatst bijgewerkt:** 19 augustus 2026 (v4 — ochtendkaart en contacten gebouwd)
+**Fase:** bouwen. De ochtendkaart en contacten staan er; de dump-invoer en het flexibele weekmenu nog niet.
 
 ## Aanleiding
 
@@ -54,12 +54,47 @@ Alle grote vragen zijn beantwoord. Wat resteert is klein genoeg om onderweg te b
 2. Beginnen bij de ochtendkaart of bij de dump? (Advies: ochtendkaart — makkelijk invoeren helpt niet zolang je nog aan de app moet denken.)
 3. Nog te testen: staat "agenda publiceren" aan in Outlook web? Zo ja, dan kan de werkagenda er alsnog in.
 
-## Volgorde als er groen licht is
+## ⚠️ Nog te doen door Merel
 
-1. **Meldingen echt laten werken** — cron-venster en route op één lijn brengen, plus een ochtendsamenvatting om 07:00. Zonder dit blijft de app passief.
-2. **`/api/today`** bouwen: één endpoint, één tijdindeling, server-side. Vervangt de 7 fetches en de 5 duplicaten.
-3. **Vandaag-scherm** met gemengde tijdlijn, samenvattingsregel, achterstallig ingeklapt onderaan.
-4. **Dump-invoer** met natuurlijke taal + zichtbare parse-preview, vast bovenaan de lijst.
+De contacttabel bestaat in `prisma/schema.prisma` maar **nog niet in Turso**. Zolang dat niet is gedaan, geeft `/contacten` en de ochtendkaart een fout. Eén commando:
+
+```bash
+turso db shell lifepilot < add-contacts.sql
+```
+
+Daarna: iCloud-agenda koppelen via `/agenda` (Agenda op de Mac → rechtsklik agenda → Delen → Openbare agenda → `webcal://`-link kopiëren), anders blijven de afspraken op de ochtendkaart leeg.
+
+## Gebouwd op 19 augustus 2026
+
+**De ochtendkaart** (`/`, was het dashboard)
+- `src/lib/day.ts` is nu de enige implementatie van "welke dag is het" en "in welk tijdvak hoort dit". Leidt de dag af in `Europe/Amsterdam` in plaats van de UTC-klok van de server (dat was rond middernacht stil verkeerd) en vergelijkt datums als `YYYY-MM-DD`-strings. `types.ts`, `folders.ts` en `/api/item-counts` delegeren er nu naartoe, dus de menu-aantallen en de lijsten kunnen niet meer van elkaar afwijken.
+- `src/lib/today.ts` stelt de kaart server-side samen; `page.tsx` rendert met de data al in handen, dus geen spinner en geen zeven parallelle fetches meer.
+- `src/components/TodayView.tsx`: afspraken en taken door elkaar op één tijdlijn met een nu-streep, samenvattingsregel bovenaan, maaltijd van vandaag uit het weekmenu, achterstallig ingeklapt onderaan met "Naar morgen"-knop, hele regel aantikbaar, optimistisch afvinken met terugdraaien bij fouten, zichtbare foutmeldingen.
+- `src/lib/calendar.ts`: agenda-ophalen uit de route gehaald en meldt nu wélke feed faalde in plaats van stil overslaan.
+- `Dashboard.tsx` is verwijderd (alleen `page.tsx` gebruikte het; `/taken` en `/herinneringen` dekken de lijsten).
+- `getDefaultFolder()` gokt niet meer WERK op kantooruren.
+
+**Meldingen** — `/api/push/send` stuurt nu de ochtendkaart, passend bij de cron van één keer per dag. Daarvoor vuurde de cron om 07:00 terwijl de route zocht naar herinneringen in de komende vijf minuten, dus er kwam nooit iets aan. `?mode=due` houdt het pad per herinnering beschikbaar voor een externe pinger. Cron staat op `0 6 * * *` = 08:00 CEST / 07:00 CET.
+
+**Contacten** (nieuw, `/contacten`)
+- `Contact`-model: naam, telefoon, e-mail, adres, verjaardag als losse dag/maand/jaar (jaar optioneel, want een verjaardag zonder geboortejaar moet kunnen), notities, `keepInTouchWeeks`, `lastContactAt`.
+- `src/lib/contacts.ts`: eerstvolgende verjaardag (29 februari schuift naar 1 maart), zeven dagen vooruitkijken, en wie aan de beurt is voor een berichtje.
+- Op de ochtendkaart: sectie "Verjaardagen" (vandaag + komende week) en "Even laten weten" met één knop "Gesproken" die de teller terugzet.
+- In de push: een verjaardag van vandaag krijgt een **eigen** melding, want die verdrinkt in een samenvattingsregel.
+- Interval is opt-in per persoon: leeg betekent geen herinnering. De app zeurt niet ongevraagd over iedereen.
+
+## Bekend en bewust laten liggen
+
+- Twee lintfouten in bestanden die niet bij dit werk horen: `ServiceWorkerRegistration.tsx` (functie gebruikt voor declaratie) en `Sidebar.tsx` (`<a>` naar `/api/auth/signout` in plaats van `<Link>`). De tweede raakt uitloggen, dus niet blind aanpassen.
+- Navigatie is nog de oude zijbalk met tien ingangen. De vier tabs uit de visie zijn stap 5.
+- `TypedItemView` en `FolderView` groeperen nog client-side; ze gebruiken wel de gedeelde helpers, dus ze kunnen niet meer afwijken van het menu.
+
+## Volgorde voor het vervolg
+
+1. ~~Meldingen echt laten werken~~ ✅
+2. ~~`/api/today`~~ ✅
+3. ~~Vandaag-scherm~~ ✅ — en contacten met verjaardagen erbij
+4. **Dump-invoer** met natuurlijke taal + zichtbare parse-preview, vast bovenaan de lijst, categorie-chips, geen modal.
 5. **Navigatie terugbrengen** naar vier ingangen; oude pagina's blijven bestaan maar uit het menu.
 6. **Weekmenu flexibel maken** — de 7 hardcoded plekken eruit, vaste dagen worden optionele vinkjes met een dagkeuze, `max_tokens` omhoog, raster onthoudt vorige week. Daarna **mealprep-modus**: invoer voor aantal gerechten + porties, en een uitgebreider antwoordformaat met kookmomenten, porties en bewaaradvies.
 7. **iCloud-agenda** aansluiten en de Outlook-publicatielink testen.
@@ -67,6 +102,7 @@ Alle grote vragen zijn beantwoord. Wat resteert is klein genoeg om onderweg te b
 
 ## Sessielog
 
+- **19 aug 2026 (v4)** — Ochtendkaart gebouwd en gepusht: gedeelde tijdmodule met tijdzone-fix, `/api/today`, server-gerenderd Vandaag-scherm, werkende ochtend-push. Daarna contacten toegevoegd op verzoek: verjaardagen op de kaart en in de push, plus een opt-in "even laten weten"-herinnering. Turso-migratie (`add-contacts.sql`) moet Merel nog draaien.
 - **19 aug 2026 (v3)** — Jannie Meppel = vrijwilligerswerk, dus blijft een categorie zonder extra functies. Weekmenu: aantal dagen wordt per week door Merel gekozen, geen instelling. Werk-to-do's blijven in de app (alleen de werkagenda valt af). Richting staat vast; klaar om te bouwen zodra er groen licht is.
 - **19 aug 2026 (v2)** — Jannie Meppel blijkt een bedrijfje (bijklus), niet een persoon om voor te zorgen: wordt het belangrijkste label, Werk het minst belangrijke. Weekmenu-eisen bijgesteld (flexibele dagen, mealprep). Bij het nakijken bleek de server het dagenraster te overschrijven en is de credits-hypothese vervangen door `max_tokens`. Visie-artifact bijgewerkt naar v2.
 - **19 aug 2026** — `CLAUDE.md` geschreven (architectuur, commands, Turso/Prisma-eigenaardigheden). Gesprek over richting, codereview, productvisie opgesteld en als artifact gepubliceerd. `HANDOVER.md` aangemaakt. Geen functionele wijzigingen.

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { CheckEntry, TodayCard, TimelineEntry } from "@/lib/today";
+import { birthdayLine } from "@/lib/contacts";
 
 const WEEKDAY_NAMES = [
   "zondag",
@@ -36,6 +37,10 @@ function formatDay(day: string): string {
 
 function summaryLine(card: TodayCard): string {
   const parts: string[] = [];
+  const jarig = card.birthdays.filter((b) => b.inDays === 0);
+  if (jarig.length > 0) {
+    parts.push(jarig.length === 1 ? `${jarig[0].name} is jarig` : `${jarig.length} jarigen`);
+  }
   if (card.summary.appointments > 0) {
     parts.push(
       card.summary.appointments === 1
@@ -132,8 +137,29 @@ export default function TodayView({ initial }: { initial: TodayCard }) {
     }
   }
 
+  async function markContacted(id: string, name: string) {
+    // Meteen uit de lijst halen; bij een fout komt hij terug bij het verversen
+    setCard((prev) => ({
+      ...prev,
+      keepInTouch: prev.keepInTouch.filter((entry) => entry.id !== id),
+    }));
+
+    try {
+      const res = await fetch(`/api/contacts/${id}/touch`, { method: "POST" });
+      if (!res.ok) throw new Error(String(res.status));
+      setNotice(`Contact met ${name} vastgelegd.`);
+    } catch {
+      setError(`Kon het contact met ${name} niet vastleggen.`);
+      await refresh();
+    }
+  }
+
   const nothingToday =
-    card.timeline.length === 0 && card.untimed.length === 0 && !card.meal;
+    card.timeline.length === 0 &&
+    card.untimed.length === 0 &&
+    !card.meal &&
+    card.birthdays.length === 0 &&
+    card.keepInTouch.length === 0;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -174,6 +200,39 @@ export default function TodayView({ initial }: { initial: TodayCard }) {
             Nakijken
           </Link>
         </div>
+      )}
+
+      {card.birthdays.length > 0 && (
+        <section className="space-y-2">
+          <SectionLabel>Verjaardagen</SectionLabel>
+          <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            {card.birthdays.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex items-center gap-3 px-4 py-3"
+              >
+                <span aria-hidden className="text-lg leading-none">
+                  {entry.inDays === 0 ? "🎂" : "🎁"}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block truncate ${
+                      entry.inDays === 0 ? "font-medium text-gray-900" : "text-gray-900"
+                    }`}
+                  >
+                    {birthdayLine(entry)}
+                  </span>
+                </span>
+                <Link
+                  href="/contacten"
+                  className="shrink-0 text-xs font-medium text-violet-700 underline underline-offset-2"
+                >
+                  Bekijken
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {nothingToday ? (
@@ -222,6 +281,34 @@ export default function TodayView({ initial }: { initial: TodayCard }) {
             Agenda toevoegen
           </Link>
         </p>
+      )}
+
+      {card.keepInTouch.length > 0 && (
+        <section className="space-y-2">
+          <SectionLabel>Even laten weten</SectionLabel>
+          <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            {card.keepInTouch.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="min-w-0">
+                  <span className="block truncate text-gray-900">{entry.name}</span>
+                  <span className="text-xs text-gray-400">
+                    {entry.weeksSince === null
+                      ? "nog geen contact vastgelegd"
+                      : entry.weeksSince === 1
+                        ? "1 week geleden"
+                        : `${entry.weeksSince} weken geleden`}
+                  </span>
+                </span>
+                <button
+                  onClick={() => void markContacted(entry.id, entry.name)}
+                  className="shrink-0 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:border-violet-300 hover:text-violet-700"
+                >
+                  Gesproken
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {card.overdue.length > 0 && (

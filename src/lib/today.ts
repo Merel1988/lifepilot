@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getCalendarEvents } from "@/lib/calendar";
 import {
+  keepInTouchDue,
+  upcomingBirthdays,
+  type BirthdayEntry,
+  type KeepInTouchEntry,
+} from "@/lib/contacts";
+import {
   completedOnDay,
   dayToUTC,
   habitDueOnWeekday,
@@ -56,6 +62,10 @@ export interface TodayCard {
   overdue: OverdueEntry[];
   done: CheckEntry[];
   meal: { title: string; note: string | null } | null;
+  /** Verjaardagen van vandaag en de komende week. */
+  birthdays: BirthdayEntry[];
+  /** Contacten waar je zelf een interval voor hebt ingesteld en die aan de beurt zijn. */
+  keepInTouch: KeepInTouchEntry[];
   calendar: {
     feeds: number;
     failed: { name: string; reason: string }[];
@@ -126,7 +136,7 @@ export async function getTodayCard(): Promise<TodayCard> {
   monday.setUTCDate(monday.getUTCDate() - ((weekday + 6) % 7));
   const weekStart = monday.toISOString().slice(0, 10);
 
-  const [items, habits, plan, calendar] = await Promise.all([
+  const [items, habits, plan, contacts, calendar] = await Promise.all([
     // Alles wat vandaag kan raken: open items tot en met vandaag, alle
     // herhalende items, plus wat vandaag al is afgevinkt.
     prisma.item.findMany({
@@ -167,6 +177,17 @@ export async function getTodayCard(): Promise<TodayCard> {
       where: { weekStart },
       orderBy: { createdAt: "desc" },
       select: { data: true },
+    }),
+    prisma.contact.findMany({
+      select: {
+        id: true,
+        name: true,
+        birthDay: true,
+        birthMonth: true,
+        birthYear: true,
+        keepInTouchWeeks: true,
+        lastContactAt: true,
+      },
     }),
     getCalendarEvents({ from: dayStart, to: dayEnd }),
   ]);
@@ -295,6 +316,8 @@ export async function getTodayCard(): Promise<TodayCard> {
   });
 
   const meal = mealForToday(plan, weekday);
+  const birthdays = upcomingBirthdays(contacts, day);
+  const keepInTouch = keepInTouchDue(contacts, now);
 
   return {
     day,
@@ -309,6 +332,8 @@ export async function getTodayCard(): Promise<TodayCard> {
     overdue,
     done,
     meal,
+    birthdays,
+    keepInTouch,
     calendar: { feeds: calendar.feeds, failed: calendar.failed },
   };
 }
@@ -316,6 +341,14 @@ export async function getTodayCard(): Promise<TodayCard> {
 /** Eén regel samenvatting, voor de push-melding en boven de kaart. */
 export function summaryLine(card: TodayCard): string {
   const parts: string[] = [];
+  const birthdaysToday = card.birthdays.filter((b) => b.inDays === 0);
+  if (birthdaysToday.length > 0) {
+    parts.push(
+      birthdaysToday.length === 1
+        ? `${birthdaysToday[0].name} is jarig`
+        : `${birthdaysToday.length} jarigen`
+    );
+  }
   if (card.summary.appointments > 0) {
     parts.push(
       card.summary.appointments === 1

@@ -142,6 +142,31 @@ model CalendarFeed {
   updatedAt DateTime @updatedAt
 }
 
+model Contact {
+  id      String  @id @default(cuid())
+  name    String
+  phone   String?
+  email   String?
+  address String?
+
+  // Losse velden in plaats van een datum, want een verjaardag zonder
+  // geboortejaar moet ook kunnen. Zonder jaar tonen we geen leeftijd.
+  birthDay   Int? // 1-31
+  birthMonth Int? // 1-12
+  birthYear  Int?
+
+  notes String?
+
+  // Elke hoeveel weken wil je contact? Leeg = geen herinnering.
+  keepInTouchWeeks Int?
+  lastContactAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([birthMonth, birthDay])
+}
+
 model PushSubscription {
   id        String   @id @default(cuid())
   endpoint  String   @unique
