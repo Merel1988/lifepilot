@@ -6,7 +6,24 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
-const providers: NextAuthConfig["providers"] = [Apple, GitHub, Google];
+/**
+ * GitHub krijgt expliciet een `issuer` mee.
+ *
+ * GitHub is RFC 9207 gaan gebruiken en stuurt sindsdien een `iss`-parameter mee
+ * terug in de callback. `oauth4webapi` vergelijkt die met de issuer van de
+ * provider, en die was in `@auth/core` 0.41 voor GitHub niet gezet — dan valt hij
+ * terug op de placeholder "https://authjs.dev", wat nooit klopt. Resultaat:
+ * inloggen faalde met CallbackRouteError / "unexpected iss response parameter
+ * value" en de gebruiker zag "There is a problem with the server configuration".
+ *
+ * Upstream staat deze regel nu ook in de provider zelf, dus bij een latere
+ * next-auth-upgrade is dit niet fout maar dubbel.
+ */
+const providers: NextAuthConfig["providers"] = [
+  Apple,
+  GitHub({ issuer: "https://github.com/login/oauth" }),
+  Google,
+];
 
 // Only include Microsoft provider if credentials are set
 if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
