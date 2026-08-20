@@ -35,7 +35,7 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 
 ## De visie in vijf regels
 
-1. De app wordt gebouwd rond **drie momenten**: de ochtendkaart (07:00, 30 sec) ✅, de dump (onderweg, 2 tikken) ✅, het weekmenu (zondag, 15 min) — nog te doen.
+1. De app wordt gebouwd rond **drie momenten**: de ochtendkaart (07:00, 30 sec) ✅, de dump (onderweg, 2 tikken) ✅, het weekmenu (zondag, 15 min) ✅.
 2. Belangrijkste UI-idee: **agenda-afspraken en taken door elkaar op één tijdlijn** op het Vandaag-scherm ✅. Dat is het enige dat geen andere app voor haar doet — maar het staat of valt bij een gekoppelde agenda (zie boven).
 3. Menu van tien ingangen naar **vier**: Vandaag, Lijst, Eten, Zoeken ✅.
 4. Invoeren wordt **één tekstveld met natuurlijke taal** ✅.
@@ -44,7 +44,7 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 ## Vastgesteld in het gesprek
 
 - **Werkagenda (Microsoft 365) valt af.** Merel verwacht geen toestemming van IT. De ochtendkaart gaat dus over "wat staat er vandaag *naast* je werk".
-- **iCloud-agenda is de agenda die het moet worden**, via een openbare `webcal://`-deellink. De bestaande ICS-parser kan dit al aan.
+- **iCloud-agenda is de agenda die het moet worden.** De route via een openbare `webcal://`-deellink bleek op 20 aug niet te kunnen: de privé-agenda is een gedeelde agenda van haar man en alleen de eigenaar kan publiceren. Zie "De agenda: wat kan nog".
 - **Privé / Werk / Jannie Meppel is een optioneel label geworden**, geen verplichte keuze en geen menu-item: chips onder het invoerveld en een filter boven de lijst.
 - **Jannie Meppel is een bedrijfje** waar Merel naast haar werk klussen voor doet, als vrijwilliger — geen uren of facturen. Dus een categorie, geen eigen module. Wel de categorie waar de app de énige plek is: loondienst-werk heeft Outlook en mail al.
 - **Alle drie de categorieën blijven** — werk*taken* horen in de app, alleen de werk*agenda* valt af. De tijdgok in `getDefaultFolder()` (ma–do 08:00–16:00 = WERK) is eruit: die labelde privé-items onzichtbaar verkeerd.
