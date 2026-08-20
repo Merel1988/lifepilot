@@ -35,6 +35,29 @@ export interface RemoteCalendar {
   shared: boolean;
 }
 
+/**
+ * Wat we in de agendamap tegenkwamen en wat we ermee deden. Zonder dit is
+ * "geen agenda's gevonden" een doodlopend spoor: je weet niet of iCloud niets
+ * teruggaf of dat wij het weggefilterd hebben.
+ */
+export interface CalendarDiagnose {
+  href: string | null;
+  naam: string | null;
+  /** De elementen in resourcetype, bijvoorbeeld ["collection", "calendar"]. */
+  soorten: string[];
+  /** De componenten uit supported-calendar-component-set, bijvoorbeeld ["VEVENT"]. */
+  componenten: string[];
+  meegenomen: boolean;
+  reden: string | null;
+}
+
+export interface CalendarListing {
+  calendars: RemoteCalendar[];
+  diagnose: CalendarDiagnose[];
+  /** De map waar we gekeken hebben. */
+  home: string;
+}
+
 export class CalDavError extends Error {
   readonly status: number | null;
 
@@ -98,6 +121,16 @@ export function unescapeXml(text: string): string {
 /** De `<response>`-blokken uit een multistatus-antwoord. */
 export function xmlResponses(xml: string): string[] {
   return xmlBlocks(xml, "response");
+}
+
+/** De tagnamen direct in een blok, zonder namespace-prefix. */
+function tagNames(xml: string): string[] {
+  const namen: string[] = [];
+  for (const match of xml.matchAll(/<(?:[A-Za-z0-9_.-]+:)?([A-Za-z0-9_-]+)(?:\s[^>]*)?\/?>/g)) {
+    const naam = match[1].toLowerCase();
+    if (!namen.includes(naam)) namen.push(naam);
+  }
+  return namen;
 }
 
 /* --------------------------------------------------------------- verkeer ---- */
@@ -248,10 +281,18 @@ export async function findCalendarHome(
 export async function listCalendars(
   credentials: Credentials,
   roots?: string[]
-): Promise<RemoteCalendar[]> {
+): Promise<CalendarListing> {
   const { home, principal } = await findCalendarHome(credentials, roots);
   const { xml, url } = await dav(home, "PROPFIND", PROP_CALENDARS, credentials, "1");
-  return parseCalendarList(xml, url, principal);
+  const listing = parseCalendarList(xml, url, principal);
+
+  if (listing.calendars.length === 0) {
+    // Alleen als er niets uitkomt: dan is de ruwe vorm van het antwoord het
+    // enige dat verder helpt. Er staat geen wachtwoord in.
+    console.error("CalDAV: geen agenda's gevonden in", home, "\n", xml.slice(0, 4000));
+  }
+
+  return { ...listing, home };
 }
 
 /** Los van het netwerk gehouden zodat er een check op kan (`npm run check:caldav`). */
@@ -259,21 +300,47 @@ export function parseCalendarList(
   xml: string,
   base: string,
   principal: string
-): RemoteCalendar[] {
-
+): { calendars: RemoteCalendar[]; diagnose: CalendarDiagnose[] } {
   const calendars: RemoteCalendar[] = [];
+  const diagnose: CalendarDiagnose[] = [];
+
   for (const block of xmlResponses(xml)) {
-    const resourcetype = xmlBlocks(block, "resourcetype")[0] ?? "";
-    if (!xmlHas(resourcetype, "calendar")) continue;
-
-    // Taken- en notitielijsten staan in dezelfde map; alleen VEVENT is een agenda
-    const components = xmlBlocks(block, "supported-calendar-component-set")[0] ?? "";
-    if (components && !/name\s*=\s*"VEVENT"/i.test(components)) continue;
-
     const href = xmlText(block, "href");
-    if (!href) continue;
 
-    const naam = xmlText(block, "displayname");
+    // Een server mag de props over meerdere propstat-blokken verdelen: de
+    // gevonden props in een 200-blok en de rest leeg in een 404-blok. Daarom
+    // álle blokken bekijken en niet alleen het eerste — anders viel een agenda
+    // weg omdat er eerst een leeg <resourcetype/> stond.
+    const soorten = xmlBlocks(block, "resourcetype").flatMap(tagNames);
+    const componentBlokken = xmlBlocks(block, "supported-calendar-component-set");
+    const componenten = componentBlokken
+      .flatMap((b) => [...b.matchAll(/name\s*=\s*["']([^"']+)["']/gi)].map((m) => m[1].toUpperCase()))
+      .filter((c, i, all) => all.indexOf(c) === i);
+
+    const naam = xmlBlocks(block, "displayname")
+      .map((b) => unescapeXml(b.replace(/<[^>]*>/g, "")).trim())
+      .find((b) => b.length > 0) ?? null;
+
+    const noteer = (meegenomen: boolean, reden: string | null) => {
+      diagnose.push({ href, naam, soorten, componenten, meegenomen, reden });
+    };
+
+    if (!href) {
+      noteer(false, "geen href in het antwoord");
+      continue;
+    }
+    if (!soorten.includes("calendar")) {
+      noteer(false, "geen agenda (resourcetype zonder calendar)");
+      continue;
+    }
+    // Taken- en notitielijsten staan in dezelfde map; alleen VEVENT is een
+    // agenda. Zegt de server niets over componenten, dan gokken we niet en
+    // nemen we hem mee.
+    if (componenten.length > 0 && !componenten.includes("VEVENT")) {
+      noteer(false, `geen afspraken, alleen ${componenten.join(" en ")}`);
+      continue;
+    }
+
     const owner = xmlBlocks(block, "owner")[0] ?? "";
     const ownerHref = xmlText(owner, "href");
 
@@ -281,12 +348,12 @@ export function parseCalendarList(
       url: new URL(href, base).toString(),
       name: naam && naam.length > 0 ? naam : "Agenda zonder naam",
       color: xmlText(block, "calendar-color"),
-      // Een agenda van iemand anders staat op naam van een ander account
       shared: isShared(ownerHref, base, principal),
     });
+    noteer(true, null);
   }
 
-  return calendars;
+  return { calendars, diagnose };
 }
 
 /**

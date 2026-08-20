@@ -18,12 +18,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }
 
   try {
-    const calendars = await listCalendars({
+    const listing = await listCalendars({
       username: account.username,
       password: decryptSecret(account.secret),
     });
     return Response.json(
-      { calendars },
+      { calendars: listing.calendars, diagnose: listing.diagnose, home: listing.home },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch (error) {

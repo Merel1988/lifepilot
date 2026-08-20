@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let calendars;
+  let listing;
   try {
-    calendars = await listCalendars({ username, password });
+    listing = await listCalendars({ username, password });
   } catch (error) {
     const melding =
       error instanceof CalDavError
@@ -73,12 +73,22 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: melding }, { status: 502 });
   }
 
-  if (calendars.length === 0) {
+  if (listing.calendars.length === 0) {
+    // Met de diagnose erbij is dit te repareren; zonder is het een doodlopend spoor.
     return Response.json(
-      { error: "Verbinding gelukt, maar er zijn geen agenda's met afspraken gevonden." },
+      {
+        error:
+          listing.diagnose.length === 0
+            ? "Verbinding gelukt, maar iCloud gaf geen enkele agenda terug op deze map."
+            : "Verbinding gelukt, maar geen van de gevonden agenda's bevat afspraken.",
+        diagnose: listing.diagnose,
+        home: listing.home,
+      },
       { status: 502 }
     );
   }
+
+  const calendars = listing.calendars;
 
   const account = await prisma.calendarAccount.create({
     data: {

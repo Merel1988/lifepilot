@@ -163,7 +163,7 @@ check("een element dat er niet is", !xmlHas("<resourcetype><collection/></resour
 check("entiteiten worden teruggedraaid", xmlText("<displayname>Jip &amp; Janneke</displayname>", "displayname") === "Jip & Janneke");
 
 // --- agendalijst
-const eigen = parseCalendarList(CALENDAR_LIST, BASE, PRINCIPAL);
+const eigen = parseCalendarList(CALENDAR_LIST, BASE, PRINCIPAL).calendars;
 check("alleen agenda's met afspraken", eigen.length === 2,
   `kreeg ${eigen.length}: ${eigen.map((c) => c.name).join(", ")}`);
 check("naam en kleur", eigen[0]?.name === "Privé" && eigen[0]?.color === "#1BADF8",
@@ -176,7 +176,68 @@ check("agenda van iemand anders is gedeeld", eigen[1]?.shared === true,
 check("taken- en notitielijst vallen weg",
   !eigen.some((c) => c.name === "Boodschappen" || c.name === "Notities"));
 
-const metPrefix = parseCalendarList(CALENDAR_LIST_PREFIXED, BASE, PRINCIPAL);
+/**
+ * De vorm die de eerste poging bij Merel liet mislukken: een server mag props
+ * over twee propstat-blokken verdelen — een 404-blok met lege elementen en een
+ * 200-blok met de echte waarden. Staat het lege blok voorop, dan zag de oude
+ * code een agenda zonder resourcetype en gooide hem weg.
+ */
+const TWEE_PROPSTAT = `<?xml version="1.0" encoding="UTF-8"?>
+<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav" xmlns:IC="http://apple.com/ns/ical/">
+  <response>
+    <href>/1234567890/calendars/gezin/</href>
+    <propstat>
+      <prop>
+        <resourcetype/>
+        <IC:calendar-color/>
+        <owner/>
+      </prop>
+      <status>HTTP/1.1 404 Not Found</status>
+    </propstat>
+    <propstat>
+      <prop>
+        <displayname>Gezin</displayname>
+        <resourcetype><collection/><C:calendar/></resourcetype>
+        <C:supported-calendar-component-set><C:comp name="VEVENT"/><C:comp name="VTODO"/></C:supported-calendar-component-set>
+      </prop>
+      <status>HTTP/1.1 200 OK</status>
+    </propstat>
+  </response>
+</multistatus>`;
+
+const tweeProp = parseCalendarList(TWEE_PROPSTAT, BASE, PRINCIPAL);
+check("props verdeeld over twee propstat-blokken", tweeProp.calendars.length === 1,
+  JSON.stringify(tweeProp.diagnose));
+check("naam komt uit het gevulde blok", tweeProp.calendars[0]?.name === "Gezin",
+  tweeProp.calendars[0]?.name);
+check("VEVENT naast VTODO is nog steeds een agenda",
+  tweeProp.diagnose[0]?.componenten.join(",") === "VEVENT,VTODO", JSON.stringify(tweeProp.diagnose[0]));
+
+const diagnose = parseCalendarList(CALENDAR_LIST, BASE, PRINCIPAL).diagnose;
+check("diagnose noemt elk gevonden pad", diagnose.length === 5, `kreeg ${diagnose.length}`);
+check("diagnose zegt waarom de takenlijst afvalt",
+  diagnose.find((d) => d.naam === "Boodschappen")?.reden === "geen afspraken, alleen VTODO",
+  JSON.stringify(diagnose.find((d) => d.naam === "Boodschappen")));
+check("diagnose zegt waarom een map afvalt",
+  diagnose.find((d) => d.naam === "Notities")?.reden === "geen agenda (resourcetype zonder calendar)");
+
+/**
+ * Een agenda waarvan de server niets zegt over componenten: dan gokken we niet
+ * en nemen we hem mee. Een gemiste agenda is erger dan een lijst te veel.
+ */
+const ZONDER_COMPONENTEN = `<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <response>
+    <href>/1234567890/calendars/onbekend/</href>
+    <propstat><prop>
+      <displayname>Vakanties</displayname>
+      <resourcetype><collection/><C:calendar/></resourcetype>
+    </prop><status>HTTP/1.1 200 OK</status></propstat>
+  </response>
+</multistatus>`;
+check("zonder componentinformatie nemen we de agenda mee",
+  parseCalendarList(ZONDER_COMPONENTEN, BASE, PRINCIPAL).calendars.length === 1);
+
+const metPrefix = parseCalendarList(CALENDAR_LIST_PREFIXED, BASE, PRINCIPAL).calendars;
 check("absolute href blijft heel",
   metPrefix[0]?.url === "https://p42-caldav.icloud.com/1234567890/calendars/werk/", metPrefix[0]?.url);
 check("zonder eigenaar gokken we niet op gedeeld", metPrefix[0]?.shared === false);
@@ -268,7 +329,7 @@ const ROOT = [`http://127.0.0.1:${poort}/`];
 const CREDS = { username: "merel@example.com", password: "appwachtwoord" };
 
 try {
-  const gevonden = await listCalendars(CREDS, ROOT);
+  const { calendars: gevonden } = await listCalendars(CREDS, ROOT);
   check("keten: agenda's gevonden via discovery", gevonden.length === 2,
     `kreeg ${gevonden.length}`);
   check("keten: de gedeelde agenda zit erbij",

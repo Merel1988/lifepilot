@@ -80,7 +80,7 @@ export async function getCalendarEvents({
       // Leeg betekent hier "geen enkele agenda"; null betekent "alle die er zijn"
       const gekozen = account.selected
         ? account.selected.split(",").filter(Boolean)
-        : (await listCalendars(credentials)).map((c) => c.url);
+        : (await listCalendars(credentials)).calendars.map((c) => c.url);
 
       const perAgenda = await Promise.all(
         gekozen.map(async (url) => {

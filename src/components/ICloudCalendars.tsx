@@ -29,6 +29,16 @@ interface RemoteCalendar {
   shared: boolean;
 }
 
+/** Wat iCloud in de agendamap had staan, en wat de app ermee deed. */
+interface Diagnose {
+  href: string | null;
+  naam: string | null;
+  soorten: string[];
+  componenten: string[];
+  meegenomen: boolean;
+  reden: string | null;
+}
+
 const PRESET_COLORS = ["#6d28d9", "#dc2626", "#16a34a", "#0891b2", "#ea580c", "#db2777"];
 
 function formatMoment(iso: string | null): string {
@@ -49,6 +59,7 @@ export default function ICloudCalendars({ onChange }: { onChange?: () => void })
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnose, setDiagnose] = useState<{ home: string | null; rijen: Diagnose[] } | null>(null);
   const [refreshing, setRefreshing] = useState<string | null>(null);
 
   const [username, setUsername] = useState("");
@@ -80,6 +91,7 @@ export default function ICloudCalendars({ onChange }: { onChange?: () => void })
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        if (data.diagnose) setDiagnose({ home: data.home ?? null, rijen: data.diagnose });
         return;
       }
       setCalendars((prev) => ({ ...prev, [id]: data.calendars }));
@@ -102,6 +114,7 @@ export default function ICloudCalendars({ onChange }: { onChange?: () => void })
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setDiagnose(null);
     try {
       const res = await fetch("/api/calendar-accounts", {
         method: "POST",
@@ -111,6 +124,7 @@ export default function ICloudCalendars({ onChange }: { onChange?: () => void })
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        if (data.diagnose) setDiagnose({ home: data.home ?? null, rijen: data.diagnose });
         return;
       }
       setAccounts((prev) => [...prev, data.account]);
@@ -284,7 +298,41 @@ export default function ICloudCalendars({ onChange }: { onChange?: () => void })
 
       {error && (
         <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-          {error}
+          <p>{error}</p>
+
+          {/* Wat iCloud teruggaf. Zonder dit is "niets gevonden" niet te repareren. */}
+          {diagnose && (
+            <div className="mt-3 pt-3 border-t border-red-200 text-xs text-red-800">
+              {diagnose.home && (
+                <p className="mb-2 break-all">
+                  <span className="font-medium">Gekeken in:</span> {diagnose.home}
+                </p>
+              )}
+              {diagnose.rijen.length === 0 ? (
+                <p>iCloud gaf geen enkele map terug op dat adres.</p>
+              ) : (
+                <>
+                  <p className="font-medium mb-1">
+                    Gevonden ({diagnose.rijen.length}):
+                  </p>
+                  <ul className="space-y-1">
+                    {diagnose.rijen.map((rij, i) => (
+                      <li key={i} className="break-all">
+                        <span className="font-medium">{rij.naam || rij.href || "zonder naam"}</span>
+                        {rij.soorten.length > 0 && <> — soort: {rij.soorten.join(", ")}</>}
+                        {rij.componenten.length > 0 && <> — inhoud: {rij.componenten.join(", ")}</>}
+                        {rij.reden && <> — overgeslagen: {rij.reden}</>}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <p className="mt-2 text-red-600">
+                Stuur dit lijstje door als het niet duidelijk is; hiermee is te zien welke agenda
+                iCloud wel heeft en waarom hij niet meedoet.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
