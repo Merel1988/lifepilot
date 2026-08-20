@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:parse": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/alias.mjs scripts/check-parse.ts",
+    "check:mealplan": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/alias.mjs scripts/check-mealplan.ts",
     "db:generate-sql": "prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script 2>/dev/null > schema.sql"
   },
   "dependencies": {

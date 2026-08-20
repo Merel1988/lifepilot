@@ -9,12 +9,22 @@ interface MealDay {
   notitie?: string;
   badge?: string | null;
   bonus_item?: boolean;
+  // Alleen in mealprep-weken
+  porties?: number;
+  kookmoment?: string;
+  bewaaradvies?: string;
+}
+
+interface PrepGroep {
+  dag: string;
+  stappen: string[];
 }
 
 interface MealPlanResult {
   week_titel: string;
   dagen: MealDay[];
-  zondag_prep?: string[];
+  prep?: PrepGroep[];
+  zondag_prep?: string[]; // oudere menu's
   boodschappenlijst?: string[];
 }
 
@@ -41,17 +51,94 @@ const MEAL_TYPES = [
   { id: "avondeten", label: "Avondeten" },
 ];
 
-// Default: 5 dinners (not Thu=restjesdag, not Fri=frietjesdag), no breakfast/lunch
-function getDefaultMealGrid(): Record<string, Record<string, boolean>> {
-  const grid: Record<string, Record<string, boolean>> = {};
+type MealGrid = Record<string, Record<string, boolean>>;
+
+/**
+ * Restjes en frietjes zijn gewoontes, geen wetten: ze staan aan of uit en de
+ * dag is vrij te kiezen. Wat hier aanstaat wordt door de server als vaste dag
+ * doorgegeven; wat uitstaat bestaat voor het menu niet.
+ */
+interface Gewoonte {
+  id: string;
+  label: string;
+  letter: string;
+  gerecht: string;
+  notitie: string | null;
+  badge: string;
+  maaltijd: string;
+  aan: boolean;
+  dag: string;
+}
+
+const DEFAULT_GEWOONTES: Gewoonte[] = [
+  {
+    id: "restjes",
+    label: "Restjesdag",
+    letter: "R",
+    gerecht: "Restjes van de week",
+    notitie: null,
+    badge: "restjes",
+    maaltijd: "avondeten",
+    aan: true,
+    dag: "Donderdag",
+  },
+  {
+    id: "frietjes",
+    label: "Frietjesdag",
+    letter: "F",
+    gerecht: "Frietjes",
+    notitie: "Met snack naar keuze",
+    badge: "frietjes",
+    maaltijd: "avondeten",
+    aan: true,
+    dag: "Vrijdag",
+  },
+];
+
+// Standaard: elke avond een menu. Wat je niet wilt laten plannen zet je uit —
+// de app gokt niet meer welke avonden dat zijn.
+function getDefaultMealGrid(): MealGrid {
+  const grid: MealGrid = {};
   for (const day of DAYS) {
-    grid[day] = {
-      ontbijt: false,
-      lunch: false,
-      avondeten: day !== "Donderdag" && day !== "Vrijdag",
-    };
+    grid[day] = { ontbijt: false, lunch: false, avondeten: true };
   }
   return grid;
+}
+
+interface Instellingen {
+  mealGrid: MealGrid;
+  gewoontes: { id: string; aan: boolean; dag: string }[];
+  mealprep: { aan: boolean; aantalGerechten: number; porties: number };
+}
+
+/** Losse velden uit een bewaarde instelling terugzetten, zonder te vertrouwen op de vorm. */
+function mergeInstellingen(raw: unknown): Partial<Instellingen> {
+  if (!raw || typeof raw !== "object") return {};
+  const v = raw as Partial<Instellingen>;
+  const out: Partial<Instellingen> = {};
+
+  if (v.mealGrid && typeof v.mealGrid === "object") {
+    const grid = getDefaultMealGrid();
+    for (const day of DAYS) {
+      for (const meal of MEAL_TYPES) {
+        const val = v.mealGrid[day]?.[meal.id];
+        if (typeof val === "boolean") grid[day][meal.id] = val;
+      }
+    }
+    out.mealGrid = grid;
+  }
+
+  if (Array.isArray(v.gewoontes)) out.gewoontes = v.gewoontes;
+
+  if (v.mealprep && typeof v.mealprep === "object") {
+    out.mealprep = {
+      aan: v.mealprep.aan === true,
+      aantalGerechten: Number(v.mealprep.aantalGerechten) || 3,
+      porties: Number(v.mealprep.porties) || 4,
+    };
+  }
+
+  return out;
 }
 
 interface PantryItem {
@@ -66,6 +153,10 @@ export default function MealPlanner() {
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [mealGrid, setMealGrid] = useState(getDefaultMealGrid);
+  const [gewoontes, setGewoontes] = useState<Gewoonte[]>(DEFAULT_GEWOONTES);
+  const [mealprepAan, setMealprepAan] = useState(false);
+  const [aantalGerechten, setAantalGerechten] = useState(3);
+  const [porties, setPorties] = useState(4);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [savingRecipe, setSavingRecipe] = useState<number | null>(null);
@@ -86,6 +177,33 @@ export default function MealPlanner() {
   useEffect(() => {
     fetch("/api/recipes?favorite=true", { cache: "no-store" }).then((r) => r.json()).then(setRecipes).catch(() => {});
     fetch("/api/pantry", { cache: "no-store" }).then((r) => r.json()).then(setPantry).catch(() => {});
+
+    // Begin waar vorige week eindigde in plaats van bij een standaardaanname
+    fetch("/api/meal-plan/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: { instellingen?: unknown }) => {
+        const vorige = mergeInstellingen(data.instellingen);
+        if (vorige.mealGrid) setMealGrid(vorige.mealGrid);
+        if (vorige.gewoontes) {
+          setGewoontes((prev) =>
+            prev.map((g) => {
+              const bewaard = vorige.gewoontes?.find((b) => b.id === g.id);
+              if (!bewaard) return g;
+              return {
+                ...g,
+                aan: bewaard.aan === true,
+                dag: DAYS.includes(bewaard.dag) ? bewaard.dag : g.dag,
+              };
+            })
+          );
+        }
+        if (vorige.mealprep) {
+          setMealprepAan(vorige.mealprep.aan);
+          setAantalGerechten(vorige.mealprep.aantalGerechten);
+          setPorties(vorige.mealprep.porties);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   async function addPantryItems() {
@@ -117,6 +235,19 @@ export default function MealPlanner() {
       ...prev,
       [day]: { ...prev[day], [meal]: !prev[day][meal] },
     }));
+  }
+
+  /** De gewoonte die deze dag/maaltijd al bezet houdt, of niets. */
+  function gewoonteVoor(day: string, meal: string): Gewoonte | undefined {
+    return gewoontes.find((g) => g.aan && g.dag === day && g.maaltijd === meal);
+  }
+
+  function toggleGewoonte(id: string) {
+    setGewoontes((prev) => prev.map((g) => (g.id === id ? { ...g, aan: !g.aan } : g)));
+  }
+
+  function setGewoonteDag(id: string, dag: string) {
+    setGewoontes((prev) => prev.map((g) => (g.id === id ? { ...g, dag } : g)));
   }
 
   function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
@@ -200,12 +331,28 @@ export default function MealPlanner() {
             ...extraVoorraad.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
           ].join(", "),
           mealGrid,
+          gewoontes: gewoontes
+            .filter((g) => g.aan)
+            .map((g) => ({
+              dag: g.dag,
+              maaltijd: g.maaltijd,
+              gerecht: g.gerecht,
+              notitie: g.notitie,
+              badge: g.badge,
+            })),
+          mealprep: { aan: mealprepAan, aantalGerechten: gerechtenNoemer, porties },
           photos: photoData,
           recipes: recipes.map((r) => ({
             title: r.title,
             category: r.category,
             ingredients: r.ingredients,
           })),
+          // Gaat mee zodat het formulier volgende week hier weer begint
+          instellingen: {
+            mealGrid,
+            gewoontes: gewoontes.map((g) => ({ id: g.id, aan: g.aan, dag: g.dag })),
+            mealprep: { aan: mealprepAan, aantalGerechten: gerechtenNoemer, porties },
+          },
         }),
       });
 
@@ -256,11 +403,25 @@ export default function MealPlanner() {
     // Pantry is NOT reset — it persists between sessions
   }
 
-  // Count how many meals are selected
-  const totalMeals = Object.values(mealGrid).reduce(
-    (sum, day) => sum + Object.values(day).filter(Boolean).length,
+  // Wat het model écht moet bedenken: aangevinkte maaltijden minus de dagen die
+  // een gewoonte al bezet houdt.
+  const totalMeals = DAYS.reduce(
+    (sum, day) =>
+      sum +
+      MEAL_TYPES.filter((m) => mealGrid[day]?.[m.id] && !gewoonteVoor(day, m.id)).length,
     0
   );
+  const actieveGewoontes = gewoontes.filter((g) => g.aan);
+  const maxGerechten = Math.max(1, totalMeals);
+  const gerechtenNoemer = Math.min(aantalGerechten, maxGerechten);
+
+  // Nieuwe menu's leveren prep-groepen per dag; oudere alleen een zondaglijst.
+  const prepGroepen: PrepGroep[] =
+    result?.prep && result.prep.length > 0
+      ? result.prep.filter((g) => g?.dag && g.stappen?.length > 0)
+      : result?.zondag_prep && result.zondag_prep.length > 0
+        ? [{ dag: "Zondag", stappen: result.zondag_prep }]
+        : [];
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -277,7 +438,16 @@ export default function MealPlanner() {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Welke maaltijden plannen?</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Do = restjesdag, Vr = frietjesdag. Vink aan wat je wilt laten plannen.
+              Vink aan wat je deze week wilt laten plannen.
+              {actieveGewoontes.length > 0 && (
+                <>
+                  {" "}
+                  {actieveGewoontes
+                    .map((g) => `${g.letter} = ${g.label.toLowerCase()}`)
+                    .join(", ")}
+                  .
+                </>
+              )}
             </p>
 
             <div className="overflow-x-auto -mx-2 px-2">
@@ -297,13 +467,16 @@ export default function MealPlanner() {
                     <tr key={meal.id}>
                       <td className="text-gray-600 font-medium py-1.5 pr-2 whitespace-nowrap">{meal.label}</td>
                       {DAYS.map((day) => {
-                        const isFixed = meal.id === "avondeten" && (day === "Donderdag" || day === "Vrijdag");
+                        const gewoonte = gewoonteVoor(day, meal.id);
                         const isOn = mealGrid[day]?.[meal.id];
                         return (
                           <td key={day} className="text-center py-1.5 px-0.5">
-                            {isFixed ? (
-                              <span className="inline-block w-7 h-7 leading-7 rounded-lg bg-gray-50 text-gray-300 text-xs">
-                                {day === "Donderdag" ? "R" : "F"}
+                            {gewoonte ? (
+                              <span
+                                className="inline-block w-7 h-7 leading-7 rounded-lg bg-gray-50 text-gray-400 text-xs"
+                                title={`${gewoonte.label}: ${gewoonte.gerecht}`}
+                              >
+                                {gewoonte.letter}
                               </span>
                             ) : (
                               <button
@@ -325,7 +498,126 @@ export default function MealPlanner() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-400 mt-2">{totalMeals} maaltijden geselecteerd</p>
+            <p className="text-xs text-gray-400 mt-2">
+              {totalMeals} {totalMeals === 1 ? "maaltijd" : "maaltijden"} te plannen
+              {actieveGewoontes.length > 0 &&
+                ` + ${actieveGewoontes.length} vaste ${
+                  actieveGewoontes.length === 1 ? "dag" : "dagen"
+                }`}
+            </p>
+          </div>
+
+          {/* Gewoontes: vaste dagen zijn optioneel en verplaatsbaar */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Vaste dagen</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Gewoontes, geen wetten. Zet uit wat deze week niet uitkomt of schuif het naar een andere dag.
+            </p>
+
+            <div className="space-y-2">
+              {gewoontes.map((g) => (
+                <div key={g.id} className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleGewoonte(g.id)}
+                    className={`w-10 h-6 rounded-full flex-shrink-0 transition-colors relative ${
+                      g.aan ? "bg-green-600" : "bg-gray-200"
+                    }`}
+                    role="switch"
+                    aria-checked={g.aan}
+                    aria-label={g.label}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
+                        g.aan ? "left-[1.125rem]" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${g.aan ? "text-gray-900" : "text-gray-400"}`}>
+                      {g.label}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">{g.gerecht}</p>
+                  </div>
+                  <select
+                    value={g.dag}
+                    onChange={(e) => setGewoonteDag(g.id, e.target.value)}
+                    disabled={!g.aan}
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 bg-gray-50 disabled:text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Mealprep */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMealprepAan((v) => !v)}
+                className={`w-10 h-6 rounded-full flex-shrink-0 transition-colors relative ${
+                  mealprepAan ? "bg-green-600" : "bg-gray-200"
+                }`}
+                role="switch"
+                aria-checked={mealprepAan}
+                aria-label="Mealprep"
+              >
+                <span
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
+                    mealprepAan ? "left-[1.125rem]" : "left-0.5"
+                  }`}
+                />
+              </button>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-900">Mealprep</h3>
+                <p className="text-xs text-gray-400">
+                  Minder verschillende gerechten voor meer dagen, met porties en bewaaradvies
+                </p>
+              </div>
+            </div>
+
+            {mealprepAan && (
+              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-gray-600 flex-1" htmlFor="aantal-gerechten">
+                    Hoeveel verschillende gerechten?
+                  </label>
+                  <input
+                    id="aantal-gerechten"
+                    type="number"
+                    min={1}
+                    max={maxGerechten}
+                    value={aantalGerechten}
+                    onChange={(e) => setAantalGerechten(Number(e.target.value))}
+                    className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-xs text-gray-600 flex-1" htmlFor="porties">
+                    Porties per maaltijd
+                  </label>
+                  <input
+                    id="porties"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={porties}
+                    onChange={(e) => setPorties(Number(e.target.value))}
+                    className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <p className="text-xs text-green-800 bg-green-50 rounded-lg px-3 py-2">
+                  {gerechtenNoemer} {gerechtenNoemer === 1 ? "gerecht" : "gerechten"} voor {totalMeals}{" "}
+                  {totalMeals === 1 ? "maaltijd" : "maaltijden"}
+                  {porties > 1 && `, ${porties} porties per keer`}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* AH Bonus */}
@@ -542,6 +834,19 @@ export default function MealPlanner() {
                     {dag.notitie && (
                       <p className="text-xs text-gray-500 mt-0.5">{dag.notitie}</p>
                     )}
+                    {(dag.kookmoment || dag.porties) && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {[
+                          dag.kookmoment,
+                          dag.porties ? `${dag.porties} porties` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+                    {dag.bewaaradvies && (
+                      <p className="text-xs text-gray-400 mt-0.5">{dag.bewaaradvies}</p>
+                    )}
                     <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
                       {dag.badge && dag.badge !== "null" && BADGE_STYLES[dag.badge] && (
                         <span
@@ -571,12 +876,17 @@ export default function MealPlanner() {
             </div>
           </div>
 
-          {/* Zondag prep */}
-          {result.zondag_prep && result.zondag_prep.length > 0 && (
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Zondag prep (~25 min)</h3>
+          {/* Prep-momenten. Oudere menu's hebben alleen zondag_prep. */}
+          {prepGroepen.map((groep) => (
+            <div
+              key={groep.dag}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100"
+            >
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                Prep op {groep.dag.toLowerCase()}
+              </h3>
               <div className="space-y-2">
-                {result.zondag_prep.map((stap, i) => (
+                {groep.stappen.map((stap, i) => (
                   <div key={i} className="flex gap-2 text-sm text-gray-700">
                     <span className="text-orange-500 flex-shrink-0">&#x25B8;</span>
                     {stap}
@@ -584,7 +894,7 @@ export default function MealPlanner() {
                 ))}
               </div>
             </div>
-          )}
+          ))}
 
           {/* Boodschappenlijst */}
           {result.boodschappenlijst && result.boodschappenlijst.length > 0 && (
