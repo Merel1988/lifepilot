@@ -2,8 +2,8 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 20 augustus 2026 (v11 — iCloud in aanbouw, weekmenu wordt versimpeld)
-**Fase:** bouwen. Er liggen twee dingen klaar om op te pakken: de iCloud-koppeling werkt nog niet bij Merel (fix uitgerold, wacht op een nieuwe poging) en het weekmenu moet eenvoudiger dan het nu is (besluit staat hieronder, code nog niet aangepast). Lees die twee stukken eerst.
+**Laatst bijgewerkt:** 20 augustus 2026 (v12 — weekmenu versimpeld, iCloud in aanbouw)
+**Fase:** bouwen. Het weekmenu is versimpeld zoals besloten (schuifjes eruit) en wacht nu op één echte generatie door Merel. De iCloud-koppeling werkt nog niet bij haar: fix uitgerold, wacht op een nieuwe poging. Lees die twee stukken eerst.
 
 ## ⚠️ Eerst dit — het wacht op Merel
 
@@ -12,7 +12,8 @@ De app werkt, maar een paar dingen kan alleen jij doen:
 1. **Controleer of inloggen weer werkt.** Op 20 aug lag het plat (zie "Storing 20 augustus" hieronder); de fix staat live sinds 11:39. Als je nog steeds een foutpagina krijgt: de logs zijn op te vragen met `vercel logs https://www.lifepilot.nl --json`.
 2. ~~Beslis over Apple en Google.~~ Gedaan op 20 aug: beide knoppen zijn weg. GitHub is de enige inlogmanier. Apple kostte €99/jaar en gaf geen agenda-toegang; Google had geen secrets in Vercel.
 3. **Probeer de iCloud-koppeling nóg een keer** op `/agenda`, met hetzelfde app-specifieke wachtwoord (niet opnieuw aanmaken). De eerste poging op 20 aug gaf "Verbinding gelukt, maar er zijn geen agenda's met afspraken gevonden"; daar is een fix voor uitgerold. Lukt het nu niet, dan staat er géén vage melding meer maar een lijstje van wat iCloud teruggaf — stuur dat door. Zie "De iCloud-koppeling: waar het nu staat".
-4. **Een paar contacten invoeren** op `/contacten`. Zonder rijen blijven "Verjaardagen" en "Even laten weten" weg.
+4. **Genereer één keer een weekmenu** op `/maaltijdplanner`. Het scherm is versimpeld (alleen nog het raster met vinkjes plus twee mealprep-velden) en de promptopbouw is met negen gevallen nagelopen, maar het antwoord van het model is nog nooit echt gezien. Dit kost een API-aanroep en schrijft een rij in Turso, dus doe het één keer en kijk of het menu klopt met wat je aanvinkte.
+5. **Een paar contacten invoeren** op `/contacten`. Zonder rijen blijven "Verjaardagen" en "Even laten weten" weg.
 
 De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en alle dertien kolommen kloppen met het model). Daar hoef je niets meer aan te doen.
 
@@ -61,7 +62,7 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 - **Jannie Meppel is een bedrijfje** waar Merel naast haar werk klussen voor doet, als vrijwilliger — geen uren of facturen. Dus een categorie, geen eigen module. Wel de categorie waar de app de énige plek is: loondienst-werk heeft Outlook en mail al.
 - **Alle drie de categorieën blijven** — werk*taken* horen in de app, alleen de werk*agenda* valt af. De tijdgok in `getDefaultFolder()` (ma–do 08:00–16:00 = WERK) is eruit: die labelde privé-items onzichtbaar verkeerd.
 - **Het weekmenu moet losser.** Frietjes op vrijdag en restjes op donderdag zijn gewoontes, geen wetten. Merel bepaalt per week zelf hoeveel en welke avonden ze een menu wil — geen vaste instelling, geen aanname. Het gekozen aantal is meteen de noemer voor mealprep ("3 gerechten voor 5 avonden"). Ze wil leren mealpreppen: minder verschillende gerechten voor meer dagen, met porties, kookmomenten, bewaaradvies en variatie binnen hetzelfde gerecht.
-- **En daarna nog losser (20 aug).** Bij het zien van het gebouwde scherm: de schuifjes voor frietjesdag en restjesdag mogen weg. Een dag niet aanvinken doet hetzelfde werk en is één begrip in plaats van drie. Een schuifje om te zeggen "vrijdag eet ik frietjes" is overbodig als ze vrijdag simpelweg niet aanvinkt. **Mealprep blijft, maar zonder schakelaar:** altijd aan, met het aantal gerechten en de porties als twee gewone invulvelden. Zie "Volgende stap: het weekmenu versimpelen".
+- **En daarna nog losser (20 aug).** Bij het zien van het gebouwde scherm: de schuifjes voor frietjesdag en restjesdag mogen weg. Een dag niet aanvinken doet hetzelfde werk en is één begrip in plaats van drie. Een schuifje om te zeggen "vrijdag eet ik frietjes" is overbodig als ze vrijdag simpelweg niet aanvinkt. **Mealprep blijft, maar zonder schakelaar:** altijd aan, met het aantal gerechten en de porties als twee gewone invulvelden. Gebouwd in v12, zie "Het weekmenu" onder "Wat er nu staat".
 - **Nu single-user**, later misschien haar partner erbij. Geen voorbereidend werk daarvoor, wel geen keuzes maken die het blokkeren.
 
 ## Wat er nu staat
@@ -85,14 +86,14 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 - Een tijd maakt het een herinnering (alleen die kan een melding sturen), `notitie:` maakt het een notitie, anders het type van de lijst waar je staat. "Meer velden" opent het oude `CreateItemModal` met de getypte tekst als titel, voor omschrijvingen en bijlagen.
 
 **Het weekmenu** (`/maaltijdplanner`)
-- Niets aan het menu staat meer vast op de server. `src/lib/meal-plan-input.ts` bouwt het schema en de prompt puur uit de invoer: het dagenraster, de gewoontes die deze week aanstaan en de mealprep-getallen. De route (`api/meal-plan/generate`) doet alleen nog het verzoek, de foutafhandeling en het opslaan.
-- **Restjes en frietjes zijn gewoontes geworden**, geen wetten: twee schakelaars met een eigen dagkeuze. Wat uitstaat bestaat voor het menu niet; wat aanstaat bezet die dag in het raster (de cel toont `R` of `F`) en telt niet mee als te plannen maaltijd. Standaard staat elke avond aan — de app gokt niet meer welke avonden Merel wil.
-- Ook de dagvoorkeuren (dinsdag snel, zondag prep) gaan alleen mee als die dag écht gepland is, en de badge-lijst in het antwoordformaat volgt de actieve gewoontes.
-- **Mealprep-modus**: aantal verschillende gerechten en porties per maaltijd, met de noemer in beeld ("3 gerechten voor 5 maaltijden"). Het antwoord krijgt dan per dag porties, kookmoment (koken / opwarmen / ontdooien / koud) en bewaaradvies, plus de opdracht om binnen hetzelfde basisgerecht te variëren.
-- `max_tokens` van 2000 naar 8000 (12000 met mealprep) — dat was de vermoedelijke oorzaak van de generieke "Er ging iets mis". Afkappen, onbereikbare API en onleesbare JSON geven nu elk een eigen melding in plaats van één stille catch.
+- Niets aan het menu staat vast op de server. `src/lib/meal-plan-input.ts` bouwt het schema en de prompt puur uit de invoer: het dagenraster en de mealprep-getallen. De route (`api/meal-plan/generate`) doet alleen nog het verzoek, de foutafhandeling en het opslaan.
+- **Eén begrip in plaats van drie** (20 aug, v12): de schuifjes voor frietjesdag, restjesdag en mealprep zijn weg. Wat overblijft is een raster met vinkjes plus twee invulvelden. Een dag niet aanvinken is nu de énige manier om iets buiten het menu te houden — vrijdag frietjes betekent: vrijdag niet aanvinken. Gevolg dat is geaccepteerd: op een niet-aangevinkte dag staat op Vandaag ook geen maaltijd meer (`today.ts` geeft dan `null`, dus er staat gewoon niets).
+- **Mealprep staat altijd aan**: aantal verschillende gerechten en porties per maaltijd, met de noemer in beeld ("3 gerechten voor 5 maaltijden"). Het antwoord geeft per dag porties, kookmoment (koken / opwarmen / ontdooien / koud) en bewaaradvies, plus de opdracht om binnen hetzelfde basisgerecht te variëren.
+- De dagvoorkeuren (dinsdag snel, zondag prep) gaan alleen mee als die dag écht gepland is.
+- `max_tokens` staat vast op 12000 — met 2000 kapte het antwoord af en zag je een generieke "Er ging iets mis". Afkappen, onbereikbare API en onleesbare JSON geven nu elk een eigen melding in plaats van één stille catch.
 - Prep-stappen komen als groepen per dag terug (`prep`); oudere menu's met `zondag_prep` worden nog getoond.
-- Het raster, de gewoontes en de mealprep-getallen worden bij het plan bewaard (sleutel `instellingen` in de JSON, geen schemawijziging) en via `GET /api/meal-plan/settings` teruggezet. Volgende week begint dus waar deze week eindigde.
-- `npm run check:mealplan` — 11 regressiegevallen op de promptopbouw in `scripts/check-mealplan.ts`. De maaltijdplanner zit achter de login en is niet met een browser te controleren; dit is de enige manier om te zien dat de server het raster volgt. De check ving meteen twee echte fouten: `0` gerechten werd stil `3` (falsy `||`), en de dagvoorkeuren noemden dagen die niet gepland waren.
+- Het raster en de mealprep-getallen worden bij het plan bewaard (sleutel `instellingen` in de JSON, geen schemawijziging) en via `GET /api/meal-plan/settings` teruggezet. Volgende week begint dus waar deze week eindigde. `mergeInstellingen` negeert wat het niet kent, dus oude rijen met `gewoontes` en `mealprep.aan` erin lossen zichzelf op.
+- `npm run check:mealplan` — 9 regressiegevallen op de promptopbouw in `scripts/check-mealplan.ts`. De maaltijdplanner zit achter de login en is niet met een browser te controleren; dit is de enige manier om te zien dat de server het raster volgt. Vier van de negen gevallen gaan over precies dat: een niet-aangevinkte dag mag nergens in de prompt opduiken.
 
 **De agenda** (`/agenda`)
 - `src/lib/caldav.ts` is een eigen mini-CalDAV-client: discovery (`current-user-principal` → `calendar-home-set` → de agenda's) en daarna een `calendar-query` REPORT per agenda. Redirects worden zelf gevolgd, want `fetch` mag bij een 301 de methode naar GET veranderen en dan komt er geen multistatus terug. iCloud verhuist je onderweg naar een andere host (`p42-caldav.icloud.com`), dus elke href wordt tegen de URL van het *antwoord* opgelost.
@@ -127,28 +128,13 @@ vercel logs https://www.lifepilot.nl --json | grep "auth\]\[cause"
 
 De Vercel CLI is nu aan dit project gekoppeld (`.vercel/`, staat in `.gitignore`), dus `vercel logs` en `vercel env ls production` werken zonder extra stappen.
 
-## Volgende stap: het weekmenu versimpelen
-
-Besluit van Merel op 20 aug, code nog niet aangepast. **Weg met de schuifjes voor frietjesdag, restjesdag en mealprep.** Wat overblijft: een raster met vinkjes voor de maaltijden die je gepland wilt hebben, plus twee invulvelden voor mealprep. Vrijdag frietjes? Dan vink je vrijdag niet aan.
-
-Er hangt niets aan vast dat breekt — het is puur schrappen. Eén gevolg om te weten: op een dag die niet is aangevinkt staat op Vandaag ook geen maaltijd meer. Op vrijdag stond eerst "Frietjes"; dat wordt leeg. Dat is geaccepteerd, want dat is precies de dag waarvan ze het al weet.
-
-Wat er weg kan, bestand voor bestand:
-
-- **`src/components/MealPlanner.tsx`** — `Gewoonte`, `DEFAULT_GEWOONTES`, de `gewoontes`-state, `gewoonteVoor`, `toggleGewoonte`, `setGewoonteDag` en de hele kaart "Vaste dagen". In het raster verdwijnt de `R`/`F`-cel: elke cel wordt weer een gewone knop. De regel onder de kop die de letters uitlegt kan mee. `mealprepAan` verdwijnt; de twee invulvelden staan altijd open, dus de `{mealprepAan && ...}`-wikkel eromheen gaat eruit. `totalMeals` wordt weer een simpele telling zonder de aftrek voor bezette dagen.
-- **`src/lib/meal-plan-input.ts`** — `Gewoonte`, `gewoonteRules`, `vasteDagen`, `geclaimd` en het veld `vasteDagen` op `PlanSchedule`. `claimKey` blijft nodig voor `gepland`. `Mealprep.aan` verdwijnt, dus `mealprepRules` en de extra velden in `outputFormat` gelden altijd. De badge-lijst wordt alleen `BASIS_BADGES`; in `MealPlanner.tsx` worden de stijlen voor `frietjes` en `restjes` in `BADGE_STYLES` daarmee dode code. In `buildUserText` gaat `vasteRegel` eruit en geldt `mealprepRegel` altijd.
-- **`src/app/api/meal-plan/generate/route.ts`** — `gewoontes` uit het body-type en uit `PlanInput`. `max_tokens` kan vast op 12000, want mealprep staat altijd aan.
-- **`scripts/check-mealplan.ts`** — de vier gevallen over gewoontes vervallen, net als "mealprep uit: geen porties gevraagd". Zet er in de plaats een geval bij dat porties, kookmoment en bewaaradvies er *altijd* in staan, en houd de gevallen die controleren dat een niet-aangevinkte dag niet in de prompt komt: dat is nu de énige manier waarop Merel iets uitzet, dus daar mag geen twijfel over bestaan.
-- **Geen database- of schemawijziging.** Oude `MealPlan`-rijen hebben `instellingen.gewoontes` en `instellingen.mealprep.aan` in hun JSON staan; `mergeInstellingen` negeert wat het niet kent, dus dat lost zichzelf op. Laat `instellingen` wel de nieuwe vorm opslaan (`mealprep` zonder `aan`, geen `gewoontes`).
-
 ## Wat nog open is in de code
 
 Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches op het dashboard, de tijdindeling die vijf keer bestond, de klokgok in `getDefaultFolder()`, en de uitlog-lintfout in de zijbalk.
 
 | Wat | Waar | Status |
 | --- | --- | --- |
-| Het weekmenu is nog niet één keer echt gegenereerd: dat kost een API-aanroep met een echte sleutel en het schrijft een rij in Turso. De promptopbouw is met 15 gevallen nagelopen, het antwoord van het model niet. Doe dit ná de versimpeling, dan hoeft het maar één keer. | `npm run check:mealplan`, `/maaltijdplanner` | Open — Merel proberen |
-| Weekmenu versimpelen: schuifjes voor frietjesdag, restjesdag en mealprep eruit. | zie "Volgende stap: het weekmenu versimpelen" | Open — prio 1, alleen schrappen |
+| Het weekmenu is nog niet één keer echt gegenereerd: dat kost een API-aanroep met een echte sleutel en het schrijft een rij in Turso. De promptopbouw is met 9 gevallen nagelopen, het antwoord van het model niet. De versimpeling is nu klaar, dus dit kan in één keer. | `npm run check:mealplan`, `/maaltijdplanner` | Open — prio 1, Merel proberen |
 | De iCloud-koppeling gaf bij de eerste echte poging geen agenda's terug. Fix uitgerold, nog niet beproefd. | zie "De iCloud-koppeling: waar het nu staat" | Open — prio 1, wacht op een poging |
 | Of "gedeeld" bij een agenda klopt, is niet met een echt account nagekeken: dat leidt de app af uit het accountnummer in het `owner`-pad. Het label is cosmetisch — een verkeerde gok verbergt geen agenda. | `src/lib/caldav.ts` (`isShared`) | Later |
 | Stille foutafhandeling (`catch {}`) op meerdere plekken: mislukkingen zijn onzichtbaar. | o.a. `api/calendar/[folder]`, `ReminderChecker`, `api/ah-bonus` | Open |
@@ -177,7 +163,7 @@ Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches 
 ## Volgorde voor het vervolg
 
 1. **iCloud-koppeling afmaken.** Merel probeert het opnieuw; komt er weer niets uit, dan wijst de diagnose op `/agenda` de aanpassing aan. Zonder werkende agenda blijft de tijdlijn leeg en is het onderscheidende deel van de visie niet te beoordelen.
-2. **Weekmenu versimpelen** — de schuifjes eruit, zoals hierboven beschreven. Klein en helemaal uitgeschreven, dus een goede eerste taak.
+2. **Weekmenu één keer echt genereren.** De invoer is nu zo klein als hij wordt; wat niemand heeft gezien is of het model er een bruikbaar menu van maakt.
 3. **Dumpen vanaf elk scherm** — de "+" in de tabbalk, zodat het dumpveld niet aan de lijstpagina's hangt.
 4. Foutmeldingen en bevestigingen overal zichtbaar maken; de `catch {}`-plekken opruimen.
 5. Dode Microsoft-code verwijderen — **wacht hiermee** tot de agenda beslist is: bij optie 3 is dit juist de code die je nodig hebt.
@@ -186,6 +172,7 @@ Daarna niets meer bouwen tot de meetlat uit de visie een antwoord heeft: tikt ze
 
 ## Sessielog
 
+- **20 aug 2026 (v12)** — Weekmenu versimpeld zoals besloten: de schuifjes voor frietjesdag, restjesdag en mealprep zijn weg, elke cel in het raster is weer een gewone knop en de twee mealprep-velden staan altijd open. Het `Gewoonte`-begrip is uit `MealPlanner.tsx`, `meal-plan-input.ts`, de generate-route en de checks verdwenen (400 regels eruit, 114 erin); `max_tokens` staat vast op 12000. `check:mealplan` opnieuw opgezet rond het enige dat Merel nu uitzet — een dag niet aanvinken — met 9 gevallen, alle groen. Typecheck en build groen; lint heeft nog alleen de bekende `ServiceWorkerRegistration`-fout.
 - **20 aug 2026 (v11)** — Merel probeerde de iCloud-koppeling: wachtwoord goed, maar geen agenda's gevonden. Oorzaak gevonden in het filter (props verdeeld over twee propstat-blokken), fix plus een leesbare diagnose in de UI uitgerold, vier gevallen bij `check:caldav`. Daarna keek ze naar het weekmenu-scherm en besloot dat de schuifjes voor frietjesdag, restjesdag en mealprep weg kunnen: een dag niet aanvinken doet hetzelfde. Die versimpeling is uitgeschreven maar nog niet gebouwd. Geen andere codewijzigingen.
 - **20 aug 2026 (v10)** — Agenda opgelost langs een andere route dan gepland: eigen CalDAV-client voor iCloud met een app-specifiek wachtwoord, omdat een gedeelde agenda niet te publiceren is door wie hem niet heeft aangemaakt. Wachtwoord versleuteld in de database, koppelscherm op `/agenda` met per-agenda vinkjes, `CalendarAccount`-tabel in Turso gezet en nagekeken, en `npm run check:caldav` met de XML-vormen van iCloud plus de hele keten tegen een lokale nep-server. Apple en Google als inlogknop verwijderd (Apple: €99/jaar en geen agenda-API), Microsoft-knoppen achter een vlag.
 - **20 aug 2026 (v9)** — Weekmenu flexibel gemaakt: promptopbouw naar `src/lib/meal-plan-input.ts`, restjes en frietjes als verplaatsbare gewoontes, mealprep-modus met porties en bewaaradvies, `max_tokens` omhoog, eigen foutmelding per faalpad, instellingen die vorige week onthouden, plus `npm run check:mealplan` met 11 gevallen. Daarna bleek uit een vraag van Merel dat de agenda-aanname niet klopt: geen van haar twee agenda's kan ze zelf delen. De agenda-opties staan nu bovenaan als besluit, en het antwoord op "kan inloggen met Apple de agenda lezen" is nee.

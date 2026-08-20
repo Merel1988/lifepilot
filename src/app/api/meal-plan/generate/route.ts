@@ -5,7 +5,6 @@ import {
   buildSystemPrompt,
   buildUserText,
   normaliseerMealprep,
-  type Gewoonte,
   type MealGrid,
   type Mealprep,
   type PlanInput,
@@ -33,7 +32,6 @@ export async function POST(request: NextRequest) {
     persoonlijkeBonus,
     voorraad,
     mealGrid,
-    gewoontes,
     mealprep,
     photos,
     recipes,
@@ -43,7 +41,6 @@ export async function POST(request: NextRequest) {
     persoonlijkeBonus: string;
     voorraad: string;
     mealGrid: MealGrid;
-    gewoontes?: Gewoonte[];
     mealprep?: Partial<Mealprep>;
     photos: PhotoData[];
     recipes: RecipeInput[];
@@ -58,11 +55,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Niets aan het menu staat hier vast: welke dagen, welke gewoontes en of het
-  // een mealprep-week is komt allemaal uit het verzoek.
+  // Niets aan het menu staat hier vast: welke dagen er gepland worden en met
+  // hoeveel gerechten komt allemaal uit het verzoek.
   const input: PlanInput = {
     mealGrid: mealGrid ?? {},
-    gewoontes: gewoontes ?? [],
     mealprep: normaliseerMealprep(mealprep),
     ahBonus,
     persoonlijkeBonus,
@@ -113,8 +109,9 @@ export async function POST(request: NextRequest) {
         model: "claude-sonnet-4-6",
         // Een menu met notities, prep-stappen en boodschappenlijst paste niet in
         // 2000 tokens; het antwoord kapte af en JSON.parse faalde, waarna je een
-        // generieke "er ging iets mis" zag. Mealprep maakt het antwoord langer.
-        max_tokens: input.mealprep.aan ? 12000 : 8000,
+        // generieke "er ging iets mis" zag. Mealprep staat altijd aan en maakt
+        // het antwoord langer, dus dit staat vast op de ruime waarde.
+        max_tokens: 12000,
         system: buildSystemPrompt(input, schedule),
         messages: [{ role: "user", content: contentBlocks }],
       }),
@@ -140,7 +137,7 @@ export async function POST(request: NextRequest) {
     return Response.json(
       {
         error:
-          "Het antwoord was te lang en werd afgekapt. Vink een paar maaltijden minder aan of zet mealprep uit.",
+          "Het antwoord was te lang en werd afgekapt. Vink een paar maaltijden minder aan.",
       },
       { status: 502 }
     );

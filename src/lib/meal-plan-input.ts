@@ -20,28 +20,16 @@ export const DAYS = [
 export type MealGrid = Record<string, Record<string, boolean>>;
 
 /**
- * Een dag die altijd hetzelfde eet — restjes, frietjes. Geen wet: de UI stuurt
- * alleen de gewoontes mee die deze week aanstaan, met de dag die Merel koos.
- * Een lege lijst betekent: plan elke dag vrij.
+ * Mealprep: minder verschillende gerechten voor meer dagen. Staat altijd aan —
+ * wie geen menu wil voor een dag vinkt die dag simpelweg niet aan.
  */
-export interface Gewoonte {
-  dag: string;
-  maaltijd: string;
-  gerecht: string;
-  notitie?: string | null;
-  badge?: string | null;
-}
-
-/** Mealprep: minder verschillende gerechten voor meer dagen. */
 export interface Mealprep {
-  aan: boolean;
   aantalGerechten: number;
   porties: number;
 }
 
 export interface PlanInput {
   mealGrid: MealGrid;
-  gewoontes: Gewoonte[];
   mealprep: Mealprep;
   ahBonus?: string;
   persoonlijkeBonus?: string;
@@ -52,13 +40,11 @@ export interface PlanInput {
 export interface PlanSchedule {
   /** Regels als "Maandag: avondeten" voor de prompt. */
   regels: string[];
-  /** Aantal maaltijden dat het model zelf moet bedenken (zonder de vaste dagen). */
+  /** Aantal maaltijden dat het model moet bedenken. */
   aantalMaaltijden: number;
-  /** De gewoontes die deze week echt meedoen. */
-  vasteDagen: Gewoonte[];
   /** Dagen waarop iets anders dan avondeten is gevraagd: daar valt het prepwerk. */
   prepDagen: string[];
-  /** Elke vrij te plannen combinatie als "Dag|maaltijd". */
+  /** Elke te plannen combinatie als "Dag|maaltijd". */
   gepland: string[];
 }
 
@@ -110,10 +96,10 @@ const DAG_VOORKEUREN: { dag: string; maaltijd: string; regel: string }[] = [
   },
 ];
 
-/** Badges die altijd kunnen. Restjes en frietjes komen van de gewoontes zelf. */
-const BASIS_BADGES = ["snel", "bonus", "prep", "favoriet"];
+/** De badges die een dag kan krijgen. */
+const BADGES = ["snel", "bonus", "prep", "favoriet"];
 
-/** Wat een gewoonte precies bezet houdt: dag én maaltijd. */
+/** Wat een dag/maaltijd-combinatie identificeert. */
 function claimKey(dag: string, maaltijd: string): string {
   return `${dag}|${maaltijd}`;
 }
@@ -128,18 +114,12 @@ function getal(raw: unknown, standaard: number): number {
 
 export function normaliseerMealprep(raw: Partial<Mealprep> | undefined): Mealprep {
   return {
-    aan: raw?.aan === true,
     aantalGerechten: getal(raw?.aantalGerechten, 3),
     porties: getal(raw?.porties, 4),
   };
 }
 
 export function buildSchedule(input: PlanInput): PlanSchedule {
-  const vasteDagen = (input.gewoontes ?? []).filter(
-    (g) => g && g.dag && g.maaltijd && g.gerecht && DAYS.includes(g.dag as (typeof DAYS)[number])
-  );
-  const geclaimd = new Set(vasteDagen.map((g) => claimKey(g.dag, g.maaltijd)));
-
   const regels: string[] = [];
   const prepDagen: string[] = [];
   const gepland: string[] = [];
@@ -147,48 +127,21 @@ export function buildSchedule(input: PlanInput): PlanSchedule {
 
   for (const day of DAYS) {
     const meals = input.mealGrid?.[day] ?? {};
-    const vrij = Object.entries(meals)
-      .filter(([meal, on]) => on && !geclaimd.has(claimKey(day, meal)))
+    const aan = Object.entries(meals)
+      .filter(([, on]) => on)
       .map(([meal]) => meal);
-    const vast = vasteDagen
-      .filter((g) => g.dag === day)
-      .map((g) => `${g.maaltijd} (staat vast: ${g.gerecht})`);
 
-    aantalMaaltijden += vrij.length;
-    for (const meal of vrij) gepland.push(claimKey(day, meal));
-    if (vrij.some((meal) => meal !== "avondeten")) prepDagen.push(day);
+    aantalMaaltijden += aan.length;
+    for (const meal of aan) gepland.push(claimKey(day, meal));
+    if (aan.some((meal) => meal !== "avondeten")) prepDagen.push(day);
 
-    const alles = [...vrij, ...vast];
-    if (alles.length > 0) regels.push(`${day}: ${alles.join(", ")}`);
+    if (aan.length > 0) regels.push(`${day}: ${aan.join(", ")}`);
   }
 
-  return { regels, aantalMaaltijden, vasteDagen, prepDagen, gepland };
-}
-
-/** Regels voor de dagen die deze week vaststaan, of het tegendeel als er geen zijn. */
-function gewoonteRules(vasteDagen: Gewoonte[]): string {
-  if (vasteDagen.length === 0) {
-    return `\n\nEr staan deze week geen vaste dagen. Plan elke genoemde dag vrij in.`;
-  }
-
-  const lines = vasteDagen.map((g) => {
-    const entry = JSON.stringify({
-      dag: g.dag,
-      type: g.maaltijd,
-      maaltijd: g.gerecht,
-      ...(g.notitie ? { notitie: g.notitie } : {}),
-      badge: g.badge ?? null,
-      bonus_item: false,
-    });
-    return `- ${g.dag} ${g.maaltijd} staat vast: geef exact ${entry} en plan hier zelf niets bij.`;
-  });
-
-  return `\n\nVASTE DAGEN DEZE WEEK (door mij gekozen, niet aan veranderen):\n${lines.join("\n")}`;
+  return { regels, aantalMaaltijden, prepDagen, gepland };
 }
 
 function mealprepRules(mealprep: Mealprep, aantalMaaltijden: number): string {
-  if (!mealprep.aan) return "";
-
   return `\n\nMEALPREP-MODUS:
 Maak MAXIMAAL ${mealprep.aantalGerechten} verschillende basisgerechten voor de ${aantalMaaltijden} te plannen maaltijden. Hetzelfde gerecht mag dus meerdere dagen terugkomen — dat is de bedoeling, geen fout.
 - Reken met ${mealprep.porties} porties per maaltijd. Zet bij elk gerecht hoeveel porties je in één keer maakt.
@@ -198,23 +151,18 @@ Maak MAXIMAAL ${mealprep.aantalGerechten} verschillende basisgerechten voor de $
 - Bundel het koken op zo min mogelijk dagen en laat de rest opwarmen.`;
 }
 
-function outputFormat(mealprep: Mealprep, prepDagen: string[], badges: string[]): string {
+function outputFormat(prepDagen: string[]): string {
   const dagVelden = [
     `      "dag": "Maandag"`,
     `      "type": "avondeten"`,
     `      "maaltijd": "naam van het gerecht"`,
     `      "notitie": "korte bereidingstip (max 2 zinnen)"`,
-    `      "badge": "een van: ${[...badges, "null"].join(" | ")}"`,
+    `      "badge": "een van: ${[...BADGES, "null"].join(" | ")}"`,
     `      "bonus_item": true of false`,
+    `      "porties": aantal porties dat je die dag maakt (getal)`,
+    `      "kookmoment": "koken | opwarmen | ontdooien | koud"`,
+    `      "bewaaradvies": "hoe lang en waar het goed blijft"`,
   ];
-
-  if (mealprep.aan) {
-    dagVelden.push(
-      `      "porties": aantal porties dat je die dag maakt (getal)`,
-      `      "kookmoment": "koken | opwarmen | ontdooien | koud"`,
-      `      "bewaaradvies": "hoe lang en waar het goed blijft"`
-    );
-  }
 
   const prepUitleg =
     prepDagen.length > 0
@@ -258,17 +206,11 @@ export function buildSystemPrompt(input: PlanInput, schedule: PlanSchedule): str
   const voorkeurenBlok =
     voorkeuren.length > 0 ? `\n\nVOORKEUREN VOOR DEZE DAGEN:\n${voorkeuren.join("\n")}` : "";
 
-  const badges = [
-    ...BASIS_BADGES,
-    ...schedule.vasteDagen.map((g) => g.badge).filter((b): b is string => Boolean(b)),
-  ].filter((b, i, all) => all.indexOf(b) === i);
-
   return (
     DIEET +
     voorkeurenBlok +
-    gewoonteRules(schedule.vasteDagen) +
     mealprepRules(input.mealprep, schedule.aantalMaaltijden) +
-    outputFormat(input.mealprep, prepDagen, badges)
+    outputFormat(prepDagen)
   );
 }
 
@@ -283,16 +225,7 @@ export function buildUserText(input: PlanInput, schedule: PlanSchedule): string 
     recipesContext = `\n\nFAVORIETE RECEPTEN (gebruik deze als ingrediënten in de bonus zijn of als ze goed passen):\n${recipeLines.join("\n")}`;
   }
 
-  const vasteRegel =
-    schedule.vasteDagen.length > 0
-      ? `\n\nDeze dagen staan vast en houd je zo: ${schedule.vasteDagen
-          .map((g) => `${g.dag} ${g.maaltijd} = ${g.gerecht}`)
-          .join("; ")}.`
-      : "";
-
-  const mealprepRegel = input.mealprep.aan
-    ? `\n\nIk wil mealpreppen: maximaal ${input.mealprep.aantalGerechten} verschillende gerechten voor ${schedule.aantalMaaltijden} te plannen maaltijden, ${input.mealprep.porties} porties per maaltijd.`
-    : "";
+  const mealprepRegel = `\n\nIk wil mealpreppen: maximaal ${input.mealprep.aantalGerechten} verschillende gerechten voor ${schedule.aantalMaaltijden} te plannen maaltijden, ${input.mealprep.porties} porties per maaltijd.`;
 
   return `Maak een weekmenu voor mij met de volgende input:
 
@@ -308,5 +241,5 @@ ${input.persoonlijkeBonus || "Geen opgegeven"}
 WAT IK AL IN HUIS HEB:
 ${input.voorraad || "Standaard voorraad"}${recipesContext}
 
-Plan ALLEEN de hierboven genoemde dag/maaltijd combinaties. Verwerk bonus slim.${vasteRegel}${mealprepRegel}`;
+Plan ALLEEN de hierboven genoemde dag/maaltijd combinaties. Verwerk bonus slim.${mealprepRegel}`;
 }

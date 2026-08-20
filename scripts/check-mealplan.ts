@@ -5,6 +5,9 @@
  * dit script is de enige manier om te zien dat de server het dagenraster van
  * Merel volgt in plaats van er eigen dagen bij te verzinnen. Dat ging eerder mis:
  * donderdag-restjes en vrijdag-frietjes stonden op zeven plekken hardcoded.
+ *
+ * Een dag niet aanvinken is nu de énige manier waarop Merel iets buiten het menu
+ * houdt, dus daar staan de meeste gevallen op.
  */
 import {
   buildSchedule,
@@ -12,7 +15,6 @@ import {
   buildUserText,
   normaliseerMealprep,
   DAYS,
-  type Gewoonte,
   type MealGrid,
   type PlanInput,
 } from "@/lib/meal-plan-input";
@@ -29,24 +31,9 @@ function grid(avonden: string[], extra: Record<string, string[]> = {}): MealGrid
   return g;
 }
 
-const RESTJES: Gewoonte = {
-  dag: "Donderdag",
-  maaltijd: "avondeten",
-  gerecht: "Restjes van de week",
-  badge: "restjes",
-};
-const FRIETJES: Gewoonte = {
-  dag: "Vrijdag",
-  maaltijd: "avondeten",
-  gerecht: "Frietjes",
-  notitie: "Met snack naar keuze",
-  badge: "frietjes",
-};
-
 function plan(over: Partial<PlanInput>): PlanInput {
   return {
     mealGrid: grid([...DAYS]),
-    gewoontes: [],
     mealprep: normaliseerMealprep(undefined),
     ...over,
   };
@@ -65,36 +52,12 @@ interface Check {
 
 const checks: Check[] = [
   {
-    naam: "geen gewoontes: geen enkele dag staat vast",
+    naam: "alleen de aangevinkte avonden komen in de prompt",
     input: plan({ mealGrid: grid(["Maandag", "Donderdag", "Vrijdag"]) }),
     regels: ["Maandag: avondeten", "Donderdag: avondeten", "Vrijdag: avondeten"],
     aantalMaaltijden: 3,
-    bevat: ["Er staan deze week geen vaste dagen"],
-    bevatNiet: ["restjes", "Frietjes", "staat vast"],
-  },
-  {
-    naam: "gewoontes aan: die dagen staan vast en tellen niet mee als te plannen",
-    input: plan({
-      mealGrid: grid(["Maandag", "Donderdag", "Vrijdag"]),
-      gewoontes: [RESTJES, FRIETJES],
-    }),
-    regels: [
-      "Maandag: avondeten",
-      "Donderdag: avondeten (staat vast: Restjes van de week)",
-      "Vrijdag: avondeten (staat vast: Frietjes)",
-    ],
-    aantalMaaltijden: 1,
-    bevat: ["Donderdag avondeten = Restjes van de week", "Vrijdag avondeten = Frietjes"],
-  },
-  {
-    naam: "gewoonte op een andere dag: frietjes op zaterdag",
-    input: plan({
-      mealGrid: grid(["Vrijdag", "Zaterdag"]),
-      gewoontes: [{ ...FRIETJES, dag: "Zaterdag" }],
-    }),
-    regels: ["Vrijdag: avondeten", "Zaterdag: avondeten (staat vast: Frietjes)"],
-    aantalMaaltijden: 1,
-    bevatNiet: ["Vrijdag avondeten = Frietjes"],
+    // Met dubbele punt: "Zondag" staat als voorbeelddag in het JSON-outputformaat
+    bevatNiet: ["Dinsdag:", "Woensdag:", "Zaterdag:", "Zondag:", "staat vast"],
   },
   {
     naam: "een dag die niet is aangevinkt komt niet in de prompt",
@@ -104,10 +67,16 @@ const checks: Check[] = [
     bevatNiet: ["Dinsdag:", "Woensdag:", "Zondag:"],
   },
   {
-    naam: "een gewoonte op een dag zonder vinkje staat er alleen als vaste dag",
-    input: plan({ mealGrid: grid(["Maandag"]), gewoontes: [RESTJES] }),
-    regels: ["Maandag: avondeten", "Donderdag: avondeten (staat vast: Restjes van de week)"],
-    aantalMaaltijden: 1,
+    naam: "vrijdag uitvinken (frietjesdag) haalt vrijdag helemaal uit de prompt",
+    input: plan({ mealGrid: grid(DAYS.filter((d) => d !== "Vrijdag")) }),
+    aantalMaaltijden: 6,
+    bevat: ["Donderdag: avondeten", "Zaterdag: avondeten"],
+    bevatNiet: ["Vrijdag"],
+  },
+  {
+    naam: "een dagvoorkeur gaat alleen mee als die dag gepland is",
+    input: plan({ mealGrid: grid(["Maandag"]) }),
+    bevatNiet: ["Dinsdag: SNEL", "Zondag: prep-dag"],
   },
   {
     naam: "ontbijt en lunch worden apart gepland",
@@ -118,41 +87,36 @@ const checks: Check[] = [
     aantalMaaltijden: 2,
   },
   {
-    naam: "mealprep uit: geen porties, kookmoment of bewaaradvies gevraagd",
+    naam: "mealprep staat altijd aan: porties, kookmoment en bewaaradvies gevraagd",
     input: plan({ mealGrid: grid(["Maandag", "Dinsdag"]) }),
-    bevatNiet: ["MEALPREP-MODUS", "kookmoment", "bewaaradvies", "porties"],
+    bevat: [
+      "MEALPREP-MODUS",
+      `"porties"`,
+      `"kookmoment"`,
+      `"bewaaradvies"`,
+      "MAXIMAAL 3 verschillende basisgerechten voor de 2 te plannen maaltijden",
+      "4 porties per maaltijd",
+    ],
   },
   {
-    naam: "mealprep aan: noemer en extra velden staan in de prompt",
+    naam: "eigen mealprep-getallen komen in de noemer terug",
     input: plan({
       mealGrid: grid(["Maandag", "Dinsdag", "Woensdag", "Zaterdag", "Zondag"]),
-      mealprep: normaliseerMealprep({ aan: true, aantalGerechten: 3, porties: 5 }),
+      mealprep: normaliseerMealprep({ aantalGerechten: 3, porties: 5 }),
     }),
     aantalMaaltijden: 5,
     bevat: [
-      "MEALPREP-MODUS",
       "MAXIMAAL 3 verschillende basisgerechten voor de 5 te plannen maaltijden",
       "5 porties per maaltijd",
-      `"kookmoment"`,
-      `"bewaaradvies"`,
       "maximaal 3 verschillende gerechten voor 5 te plannen maaltijden",
     ],
   },
   {
     naam: "rare getallen worden rechtgetrokken",
     input: plan({
-      mealprep: normaliseerMealprep({ aan: true, aantalGerechten: 0, porties: -2 }),
+      mealprep: normaliseerMealprep({ aantalGerechten: 0, porties: -2 }),
     }),
-    bevat: ["MAXIMAAL 1 verschillende basisgerechten"],
-  },
-  {
-    naam: "een gewoonte met een onbekende dag wordt genegeerd",
-    input: plan({
-      mealGrid: grid(["Maandag"]),
-      gewoontes: [{ ...RESTJES, dag: "Maandagavond" }],
-    }),
-    regels: ["Maandag: avondeten"],
-    bevat: ["Er staan deze week geen vaste dagen"],
+    bevat: ["MAXIMAAL 1 verschillende basisgerechten", "1 porties per maaltijd"],
   },
   {
     naam: "niets aangevinkt levert een leeg schema (de route geeft dan een fout)",

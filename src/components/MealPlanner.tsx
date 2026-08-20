@@ -9,7 +9,7 @@ interface MealDay {
   notitie?: string;
   badge?: string | null;
   bonus_item?: boolean;
-  // Alleen in mealprep-weken
+  // Mealprep-velden; oudere menu's van vóór 20 aug 2026 hebben ze niet
   porties?: number;
   kookmoment?: string;
   bewaaradvies?: string;
@@ -37,10 +37,8 @@ interface Recipe {
 
 const BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   snel: { bg: "bg-amber-100", text: "text-amber-800", label: "Snel!" },
-  frietjes: { bg: "bg-pink-100", text: "text-pink-800", label: "Frietjes!" },
   bonus: { bg: "bg-green-100", text: "text-green-800", label: "Bonus" },
   prep: { bg: "bg-violet-100", text: "text-violet-800", label: "Prep dag" },
-  restjes: { bg: "bg-orange-100", text: "text-orange-800", label: "Restjesdag" },
   favoriet: { bg: "bg-red-100", text: "text-red-800", label: "Favoriet" },
 };
 
@@ -52,48 +50,6 @@ const MEAL_TYPES = [
 ];
 
 type MealGrid = Record<string, Record<string, boolean>>;
-
-/**
- * Restjes en frietjes zijn gewoontes, geen wetten: ze staan aan of uit en de
- * dag is vrij te kiezen. Wat hier aanstaat wordt door de server als vaste dag
- * doorgegeven; wat uitstaat bestaat voor het menu niet.
- */
-interface Gewoonte {
-  id: string;
-  label: string;
-  letter: string;
-  gerecht: string;
-  notitie: string | null;
-  badge: string;
-  maaltijd: string;
-  aan: boolean;
-  dag: string;
-}
-
-const DEFAULT_GEWOONTES: Gewoonte[] = [
-  {
-    id: "restjes",
-    label: "Restjesdag",
-    letter: "R",
-    gerecht: "Restjes van de week",
-    notitie: null,
-    badge: "restjes",
-    maaltijd: "avondeten",
-    aan: true,
-    dag: "Donderdag",
-  },
-  {
-    id: "frietjes",
-    label: "Frietjesdag",
-    letter: "F",
-    gerecht: "Frietjes",
-    notitie: "Met snack naar keuze",
-    badge: "frietjes",
-    maaltijd: "avondeten",
-    aan: true,
-    dag: "Vrijdag",
-  },
-];
 
 // Standaard: elke avond een menu. Wat je niet wilt laten plannen zet je uit —
 // de app gokt niet meer welke avonden dat zijn.
@@ -107,8 +63,7 @@ function getDefaultMealGrid(): MealGrid {
 
 interface Instellingen {
   mealGrid: MealGrid;
-  gewoontes: { id: string; aan: boolean; dag: string }[];
-  mealprep: { aan: boolean; aantalGerechten: number; porties: number };
+  mealprep: { aantalGerechten: number; porties: number };
 }
 
 /** Losse velden uit een bewaarde instelling terugzetten, zonder te vertrouwen op de vorm. */
@@ -128,11 +83,8 @@ function mergeInstellingen(raw: unknown): Partial<Instellingen> {
     out.mealGrid = grid;
   }
 
-  if (Array.isArray(v.gewoontes)) out.gewoontes = v.gewoontes;
-
   if (v.mealprep && typeof v.mealprep === "object") {
     out.mealprep = {
-      aan: v.mealprep.aan === true,
       aantalGerechten: Number(v.mealprep.aantalGerechten) || 3,
       porties: Number(v.mealprep.porties) || 4,
     };
@@ -153,8 +105,6 @@ export default function MealPlanner() {
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Record<number, boolean>>({});
   const [mealGrid, setMealGrid] = useState(getDefaultMealGrid);
-  const [gewoontes, setGewoontes] = useState<Gewoonte[]>(DEFAULT_GEWOONTES);
-  const [mealprepAan, setMealprepAan] = useState(false);
   const [aantalGerechten, setAantalGerechten] = useState(3);
   const [porties, setPorties] = useState(4);
   const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
@@ -184,21 +134,7 @@ export default function MealPlanner() {
       .then((data: { instellingen?: unknown }) => {
         const vorige = mergeInstellingen(data.instellingen);
         if (vorige.mealGrid) setMealGrid(vorige.mealGrid);
-        if (vorige.gewoontes) {
-          setGewoontes((prev) =>
-            prev.map((g) => {
-              const bewaard = vorige.gewoontes?.find((b) => b.id === g.id);
-              if (!bewaard) return g;
-              return {
-                ...g,
-                aan: bewaard.aan === true,
-                dag: DAYS.includes(bewaard.dag) ? bewaard.dag : g.dag,
-              };
-            })
-          );
-        }
         if (vorige.mealprep) {
-          setMealprepAan(vorige.mealprep.aan);
           setAantalGerechten(vorige.mealprep.aantalGerechten);
           setPorties(vorige.mealprep.porties);
         }
@@ -235,19 +171,6 @@ export default function MealPlanner() {
       ...prev,
       [day]: { ...prev[day], [meal]: !prev[day][meal] },
     }));
-  }
-
-  /** De gewoonte die deze dag/maaltijd al bezet houdt, of niets. */
-  function gewoonteVoor(day: string, meal: string): Gewoonte | undefined {
-    return gewoontes.find((g) => g.aan && g.dag === day && g.maaltijd === meal);
-  }
-
-  function toggleGewoonte(id: string) {
-    setGewoontes((prev) => prev.map((g) => (g.id === id ? { ...g, aan: !g.aan } : g)));
-  }
-
-  function setGewoonteDag(id: string, dag: string) {
-    setGewoontes((prev) => prev.map((g) => (g.id === id ? { ...g, dag } : g)));
   }
 
   function handlePhotos(e: React.ChangeEvent<HTMLInputElement>) {
@@ -331,16 +254,7 @@ export default function MealPlanner() {
             ...extraVoorraad.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
           ].join(", "),
           mealGrid,
-          gewoontes: gewoontes
-            .filter((g) => g.aan)
-            .map((g) => ({
-              dag: g.dag,
-              maaltijd: g.maaltijd,
-              gerecht: g.gerecht,
-              notitie: g.notitie,
-              badge: g.badge,
-            })),
-          mealprep: { aan: mealprepAan, aantalGerechten: gerechtenNoemer, porties },
+          mealprep: { aantalGerechten: gerechtenNoemer, porties },
           photos: photoData,
           recipes: recipes.map((r) => ({
             title: r.title,
@@ -350,8 +264,7 @@ export default function MealPlanner() {
           // Gaat mee zodat het formulier volgende week hier weer begint
           instellingen: {
             mealGrid,
-            gewoontes: gewoontes.map((g) => ({ id: g.id, aan: g.aan, dag: g.dag })),
-            mealprep: { aan: mealprepAan, aantalGerechten: gerechtenNoemer, porties },
+            mealprep: { aantalGerechten: gerechtenNoemer, porties },
           },
         }),
       });
@@ -403,15 +316,12 @@ export default function MealPlanner() {
     // Pantry is NOT reset — it persists between sessions
   }
 
-  // Wat het model écht moet bedenken: aangevinkte maaltijden minus de dagen die
-  // een gewoonte al bezet houdt.
+  // Wat het model moet bedenken: alles wat is aangevinkt. Een dag die je niet
+  // aanvinkt is de enige manier om iets buiten het menu te houden.
   const totalMeals = DAYS.reduce(
-    (sum, day) =>
-      sum +
-      MEAL_TYPES.filter((m) => mealGrid[day]?.[m.id] && !gewoonteVoor(day, m.id)).length,
+    (sum, day) => sum + MEAL_TYPES.filter((m) => mealGrid[day]?.[m.id]).length,
     0
   );
-  const actieveGewoontes = gewoontes.filter((g) => g.aan);
   const maxGerechten = Math.max(1, totalMeals);
   const gerechtenNoemer = Math.min(aantalGerechten, maxGerechten);
 
@@ -438,16 +348,8 @@ export default function MealPlanner() {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <h3 className="text-sm font-semibold text-gray-900 mb-1">Welke maaltijden plannen?</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Vink aan wat je deze week wilt laten plannen.
-              {actieveGewoontes.length > 0 && (
-                <>
-                  {" "}
-                  {actieveGewoontes
-                    .map((g) => `${g.letter} = ${g.label.toLowerCase()}`)
-                    .join(", ")}
-                  .
-                </>
-              )}
+              Vink aan wat je deze week wilt laten plannen. Wat je niet aanvinkt komt niet in het
+              menu — zo houd je vrijdag vrij voor frietjes.
             </p>
 
             <div className="overflow-x-auto -mx-2 px-2">
@@ -467,29 +369,21 @@ export default function MealPlanner() {
                     <tr key={meal.id}>
                       <td className="text-gray-600 font-medium py-1.5 pr-2 whitespace-nowrap">{meal.label}</td>
                       {DAYS.map((day) => {
-                        const gewoonte = gewoonteVoor(day, meal.id);
                         const isOn = mealGrid[day]?.[meal.id];
                         return (
                           <td key={day} className="text-center py-1.5 px-0.5">
-                            {gewoonte ? (
-                              <span
-                                className="inline-block w-7 h-7 leading-7 rounded-lg bg-gray-50 text-gray-400 text-xs"
-                                title={`${gewoonte.label}: ${gewoonte.gerecht}`}
-                              >
-                                {gewoonte.letter}
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => toggleMeal(day, meal.id)}
-                                className={`w-7 h-7 rounded-lg transition-colors ${
-                                  isOn
-                                    ? "bg-green-600 text-white"
-                                    : "bg-gray-100 text-gray-300 hover:bg-gray-200"
-                                }`}
-                              >
-                                {isOn ? "✓" : ""}
-                              </button>
-                            )}
+                            <button
+                              onClick={() => toggleMeal(day, meal.id)}
+                              aria-pressed={isOn}
+                              aria-label={`${meal.label} ${day}`}
+                              className={`w-7 h-7 rounded-lg transition-colors ${
+                                isOn
+                                  ? "bg-green-600 text-white"
+                                  : "bg-gray-100 text-gray-300 hover:bg-gray-200"
+                              }`}
+                            >
+                              {isOn ? "✓" : ""}
+                            </button>
                           </td>
                         );
                       })}
@@ -500,124 +394,51 @@ export default function MealPlanner() {
             </div>
             <p className="text-xs text-gray-400 mt-2">
               {totalMeals} {totalMeals === 1 ? "maaltijd" : "maaltijden"} te plannen
-              {actieveGewoontes.length > 0 &&
-                ` + ${actieveGewoontes.length} vaste ${
-                  actieveGewoontes.length === 1 ? "dag" : "dagen"
-                }`}
             </p>
           </div>
 
-          {/* Gewoontes: vaste dagen zijn optioneel en verplaatsbaar */}
+          {/* Mealprep: geen schakelaar, alleen de twee getallen */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">Vaste dagen</h3>
-            <p className="text-xs text-gray-400 mb-3">
-              Gewoontes, geen wetten. Zet uit wat deze week niet uitkomt of schuif het naar een andere dag.
+            <h3 className="text-sm font-semibold text-gray-900">Mealprep</h3>
+            <p className="text-xs text-gray-400">
+              Minder verschillende gerechten voor meer dagen, met porties en bewaaradvies
             </p>
 
-            <div className="space-y-2">
-              {gewoontes.map((g) => (
-                <div key={g.id} className="flex items-center gap-3">
-                  <button
-                    onClick={() => toggleGewoonte(g.id)}
-                    className={`w-10 h-6 rounded-full flex-shrink-0 transition-colors relative ${
-                      g.aan ? "bg-green-600" : "bg-gray-200"
-                    }`}
-                    role="switch"
-                    aria-checked={g.aan}
-                    aria-label={g.label}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
-                        g.aan ? "left-[1.125rem]" : "left-0.5"
-                      }`}
-                    />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${g.aan ? "text-gray-900" : "text-gray-400"}`}>
-                      {g.label}
-                    </p>
-                    <p className="text-xs text-gray-400 truncate">{g.gerecht}</p>
-                  </div>
-                  <select
-                    value={g.dag}
-                    onChange={(e) => setGewoonteDag(g.id, e.target.value)}
-                    disabled={!g.aan}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-900 bg-gray-50 disabled:text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    {DAYS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Mealprep */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setMealprepAan((v) => !v)}
-                className={`w-10 h-6 rounded-full flex-shrink-0 transition-colors relative ${
-                  mealprepAan ? "bg-green-600" : "bg-gray-200"
-                }`}
-                role="switch"
-                aria-checked={mealprepAan}
-                aria-label="Mealprep"
-              >
-                <span
-                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${
-                    mealprepAan ? "left-[1.125rem]" : "left-0.5"
-                  }`}
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-600 flex-1" htmlFor="aantal-gerechten">
+                  Hoeveel verschillende gerechten?
+                </label>
+                <input
+                  id="aantal-gerechten"
+                  type="number"
+                  min={1}
+                  max={maxGerechten}
+                  value={aantalGerechten}
+                  onChange={(e) => setAantalGerechten(Number(e.target.value))}
+                  className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
-              </button>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">Mealprep</h3>
-                <p className="text-xs text-gray-400">
-                  Minder verschillende gerechten voor meer dagen, met porties en bewaaradvies
-                </p>
               </div>
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-600 flex-1" htmlFor="porties">
+                  Porties per maaltijd
+                </label>
+                <input
+                  id="porties"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={porties}
+                  onChange={(e) => setPorties(Number(e.target.value))}
+                  className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+              <p className="text-xs text-green-800 bg-green-50 rounded-lg px-3 py-2">
+                {gerechtenNoemer} {gerechtenNoemer === 1 ? "gerecht" : "gerechten"} voor {totalMeals}{" "}
+                {totalMeals === 1 ? "maaltijd" : "maaltijden"}
+                {porties > 1 && `, ${porties} porties per keer`}
+              </p>
             </div>
-
-            {mealprepAan && (
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                <div className="flex items-center gap-3">
-                  <label className="text-xs text-gray-600 flex-1" htmlFor="aantal-gerechten">
-                    Hoeveel verschillende gerechten?
-                  </label>
-                  <input
-                    id="aantal-gerechten"
-                    type="number"
-                    min={1}
-                    max={maxGerechten}
-                    value={aantalGerechten}
-                    onChange={(e) => setAantalGerechten(Number(e.target.value))}
-                    className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-xs text-gray-600 flex-1" htmlFor="porties">
-                    Porties per maaltijd
-                  </label>
-                  <input
-                    id="porties"
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={porties}
-                    onChange={(e) => setPorties(Number(e.target.value))}
-                    className="w-16 px-2 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-900 bg-gray-50 text-center focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-                <p className="text-xs text-green-800 bg-green-50 rounded-lg px-3 py-2">
-                  {gerechtenNoemer} {gerechtenNoemer === 1 ? "gerecht" : "gerechten"} voor {totalMeals}{" "}
-                  {totalMeals === 1 ? "maaltijd" : "maaltijden"}
-                  {porties > 1 && `, ${porties} porties per keer`}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* AH Bonus */}
