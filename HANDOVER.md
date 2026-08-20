@@ -2,15 +2,17 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 19 augustus 2026 (v7 — herschreven; drie losse "Gebouwd"-secties samengevoegd)
+**Laatst bijgewerkt:** 20 augustus 2026 (v8 — inloggen gerepareerd)
 **Fase:** bouwen. Ochtendkaart, contacten, dump-invoer en de vier ingangen staan er. Het flexibele weekmenu is het grote stuk dat nog open is.
 
 ## ⚠️ Eerst dit — het wacht op Merel
 
-De app werkt, maar twee dingen kan alleen jij doen, en zonder die twee ziet de ochtendkaart half leeg uit:
+De app werkt, maar een paar dingen kan alleen jij doen:
 
-1. **iCloud-agenda koppelen** via `/agenda`. Agenda op de Mac → rechtsklik op de agenda → Delen → Openbare agenda aanzetten → de `webcal://`-link kopiëren en in de app plakken. Zonder feed staan er geen afspraken op de tijdlijn, en die tijdlijn is juist het enige dat geen andere app voor je doet.
-2. **Een paar contacten invoeren** op `/contacten`. Zonder rijen blijven "Verjaardagen" en "Even laten weten" weg.
+1. **Controleer of inloggen weer werkt.** Op 20 aug lag het plat (zie "Storing 20 augustus" hieronder); de fix staat live sinds 11:39. Als je nog steeds een foutpagina krijgt: de logs zijn op te vragen met `vercel logs https://www.lifepilot.nl --json`.
+2. **Beslis over Apple en Google.** De loginpagina toont drie knoppen, maar in Vercel staan alleen de `AUTH_GITHUB_*`-variabelen. Apple en Google kunnen dus niet werken; die knoppen leiden naar dezelfde foutpagina. Kies: secrets toevoegen in Vercel, of die twee knoppen weghalen. Niet laten staan — een knop die altijd faalt kost vertrouwen in de hele app.
+3. **iCloud-agenda koppelen** via `/agenda`. Agenda op de Mac → rechtsklik op de agenda → Delen → Openbare agenda aanzetten → de `webcal://`-link kopiëren en in de app plakken. Zonder feed staan er geen afspraken op de tijdlijn, en die tijdlijn is juist het enige dat geen andere app voor je doet.
+4. **Een paar contacten invoeren** op `/contacten`. Zonder rijen blijven "Verjaardagen" en "Even laten weten" weg.
 
 De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en alle dertien kolommen kloppen met het model). Daar hoef je niets meer aan te doen.
 
@@ -69,6 +71,22 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 
 **De eerste geautomatiseerde check** — `npm run check:parse` draait 29 regressiegevallen uit `scripts/check-parse.ts` op Node's eigen TypeScript-stripping, met `scripts/alias.mjs` voor de `@/`-alias. Geen testframework toegevoegd. De check ving meteen een echte bug: de titel-opschoning knipte zonder woordgrens, dus "afval buiten zetten" werd "afval buiten zett". Hetzelfde patroon past op `day.ts` als je daar ooit aan sleutelt.
 
+## Storing 20 augustus: inloggen ging niet meer
+
+**Symptoom:** na het kiezen van GitHub kwam er "Server error — There is a problem with the server configuration."
+
+**Oorzaak, uit de productielogs:** `GET /api/auth/callback/github` gooide `CallbackRouteError` met als cause `unexpected "iss" (issuer) response parameter value`, en als detail `expected: "https://authjs.dev"`. GitHub is RFC 9207 gaan gebruiken en stuurt sinds kort een `iss`-parameter mee in de callback. `oauth4webapi` vergelijkt die met de issuer van de provider (regel 2068 in de geïnstalleerde build: gooit alléén als `iss` aanwezig is en afwijkt), en `@auth/core` 0.41 zet voor GitHub geen `issuer` — dan valt hij terug op de placeholder `https://authjs.dev`. Er was dus niets aan onze kant veranderd; GitHub veranderde.
+
+**Fix:** `GitHub({ issuer: "https://github.com/login/oauth" })` in `src/auth.ts`. Vooraf nagemeten met `parseProviders` uit het geïnstalleerde pakket: zonder die regel wordt `as.issuer` de placeholder, met die regel de waarde die GitHub meestuurt, en er komt géén discovery-verzoek bij (die tak kiest de callback alleen als `token`/`userinfo` geen echte URL hebben). Upstream staat dezelfde regel nu in de provider zelf, dus bij een latere `next-auth`-upgrade is dit dubbel in plaats van fout — **niet weghalen zonder te controleren of de nieuwe versie hem zelf zet.**
+
+**Wat dit leert voor de volgende keer:** de foutpagina van NextAuth zegt altijd "server configuration", ongeacht de echte oorzaak. De echte fout staat alleen in de Vercel-logs:
+
+```bash
+vercel logs https://www.lifepilot.nl --json | grep "auth\]\[cause"
+```
+
+De Vercel CLI is nu aan dit project gekoppeld (`.vercel/`, staat in `.gitignore`), dus `vercel logs` en `vercel env ls production` werken zonder extra stappen.
+
 ## Wat nog open is in de code
 
 Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches op het dashboard, de tijdindeling die vijf keer bestond, de klokgok in `getDefaultFolder()`, en de uitlog-lintfout in de zijbalk.
@@ -77,6 +95,7 @@ Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches 
 | --- | --- | --- |
 | Maaltijdplanner faalt, **niet** door credits: de route geeft API-fouten netjes terug en `MealPlanner` toont ze. Waarschijnlijker `max_tokens: 2000` — een weekmenu met notities, prep-stappen en boodschappenlijst past daar niet in, waarna `JSON.parse` faalt en je de generieke "Er ging iets mis" ziet. Met mealprep wordt het antwoord langer, dus moet dit omhoog. | `src/app/api/meal-plan/generate/route.ts:181` | Open — prio 1 |
 | **De server overschrijft het dagenraster.** `mealGrid` bestaat al in de UI (7 dagen × 3 maaltijden), maar de route pusht donderdag-restjes en vrijdag-frietjes ongeacht de vinkjes, en `getDefaultMealGrid()` zet die twee dagen standaard uit. Hardcoded op 7 plekken: systeemprompt (17, 18, 58, 59), dagenlijst (114, 115), userText (167). Alle zeven moeten zacht worden. | `src/app/api/meal-plan/generate/route.ts`, `src/components/MealPlanner.tsx:45` | Open — prio 1 |
+| Apple en Google staan als provider in de code, maar hun secrets staan niet in Vercel. Die twee knoppen op de loginpagina falen dus altijd. | `src/auth.ts`, `src/app/login/page.tsx`, Vercel env | Open — beslissing aan Merel |
 | Stille foutafhandeling (`catch {}`) op meerdere plekken: mislukkingen zijn onzichtbaar. | o.a. `api/calendar/[folder]`, `ReminderChecker`, `api/ah-bonus` | Open |
 | Microsoft-integratie is dode code: `MICROSOFT_CLIENT_ID` staat niet in `.env`, dus de provider wordt nooit geregistreerd en de statusroute zegt altijd "niet verbonden". Nu de werkagenda afvalt, kan dit weg. | `src/auth.ts`, `src/app/api/microsoft/status/route.ts`, `src/lib/microsoft-graph.ts` | Open — opruimen |
 | Verversen via het zelfverzonnen window-event `item-moved`; niets controleert of alle plekken meedoen. | `MainNav`, `FolderView`, `ItemListView`, `QuickAdd` | Later |
@@ -88,6 +107,7 @@ Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches 
 ## Bekend en bewust laten liggen
 
 - **De navigatie is niet visueel nagekeken.** Alles zit achter de OAuth-login, dus een browsercheck kan hier niet. Typecheck en build zijn groen, maar kijk zelf op je telefoon of de vaste kop en de tabbalk niets afsnijden; de marges zitten in `pt-20 pb-24` in `AppShell.tsx`.
+- `next-auth` zit op `5.0.0-beta.30` (een beta, met een caret-range in `package.json`). `package-lock.json` staat in git en Vercel bouwt met `npm ci`, dus builds zijn reproduceerbaar — zonder die lockfile zou een nieuwe beta ongemerkt mee kunnen komen. De beta-tag staat inmiddels op `.32`; upgraden kan de GitHub-issuer-regel overbodig maken, maar doe dat als losse stap en test inloggen daarna.
 - Eén lintfout in een bestand dat bij geen van deze stappen hoort: `ServiceWorkerRegistration.tsx` (functie gebruikt vóór declaratie). `npm run lint` is dus nooit helemaal groen.
 - Op de ochtendkaart staat nog geen dumpveld. Nu de tabbalk er is, is de logische stap één "+" in die balk die overal het veld opent, in plaats van drie losse velden op de lijstpagina's.
 - `FolderView` (`/folder/[folder]`) heeft nog de oude knop met de modal en geen dumpveld. Die route staat niet meer in het menu en kan waarschijnlijk vervallen zodra de categoriefilter in `/lijst` genoeg blijkt.
@@ -111,6 +131,7 @@ Daarna niets meer bouwen tot de meetlat uit de visie een antwoord heeft: tikt ze
 
 ## Sessielog
 
+- **20 aug 2026 (v8)** — Inloggen lag plat. Oorzaak uit de productielogs gehaald (GitHub + RFC 9207 versus de placeholder-issuer in `@auth/core`), fix van één regel in `src/auth.ts` nagemeten en uitgerold. Onderweg gezien dat Apple en Google geen secrets hebben in Vercel. Vercel CLI aan het project gekoppeld.
 - **19 aug 2026 (v7)** — Handover herschreven: drie losse "Gebouwd op 19 augustus"-secties samengevoegd tot één "Wat er nu staat", opgeloste bevindingen uit de tabel gehaald, het werk voor Merel bovenaan gezet en de volgorde opnieuw genummerd. Geen codewijzigingen.
 - **19 aug 2026 (v6)** — Navigatie naar vier ingangen: `MainNav` met tabbalk en rail, "Meer"-la voor de pagina's die uit het menu gingen, nieuwe `/lijst` met alle types op één tijdlijn, `TypedItemView` → `ItemListView` op de gedeelde tijdindeling, `AppShell` als server component met uitloggen via een server action, `Sidebar.tsx` verwijderd. Contacttabel in Turso nagekeken.
 - **19 aug 2026 (v5)** — Dump-invoer gebouwd: Nederlandse parser met 29 regressiegevallen (`npm run check:parse`), `QuickAdd` met zichtbare preview bovenaan de lijsten, categorie-chips, ongedaan maken, en `CreateItemModal` als escape met voorgevulde titel. Dag- en maandnamen naar `day.ts` gehaald.

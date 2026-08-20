@@ -38,7 +38,9 @@ nog van vóór dit werk, dus `npm run lint` is nooit helemaal groen.
 
 ## Auth
 
-- `src/auth.ts`: NextAuth v5 (beta) met PrismaAdapter maar `session.strategy = "jwt"`. Providers: Apple, GitHub, Google, plus Microsoft Entra ID die **alleen** wordt geregistreerd als `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET` gezet zijn (die twee staan niet in `.env.example`). Microsoft access/refresh tokens worden in de JWT gezet én in de `Account`-rij bewaard.
+- `src/auth.ts`: NextAuth v5 (beta) met PrismaAdapter maar `session.strategy = "jwt"`. Providers: Apple, GitHub, Google, plus Microsoft Entra ID die **alleen** wordt geregistreerd als `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET` gezet zijn (die twee staan niet in `.env.example`).
+- GitHub krijgt expliciet `issuer: "https://github.com/login/oauth"` mee. Dat is geen kosmetiek: GitHub stuurt sinds RFC 9207 een `iss`-parameter mee en `@auth/core` 0.41 valt zonder deze regel terug op de placeholder `https://authjs.dev`, waarna inloggen faalt met een misleidende "problem with the server configuration". Weghalen mag pas als de dan geïnstalleerde `next-auth` de issuer zelf zet.
+- Alleen `AUTH_GITHUB_*` staat in Vercel; Apple en Google hebben daar geen secrets en werken in productie dus niet. Ga er niet van uit dat een provider die in de code staat ook echt kan inloggen. Microsoft access/refresh tokens worden in de JWT gezet én in de `Account`-rij bewaard.
 - `src/proxy.ts` is de Next.js 16-variant van middleware: `export default auth` met een matcher die alles beschermt behalve `api/auth`, statics, icons en manifest.
 - Elke API-route roept daarnaast zelf `requireAuth()` uit `src/lib/auth-guard.ts` aan als eerste regel en returnt de 401-response als die niet null is. Volg dat patroon bij nieuwe routes.
 
