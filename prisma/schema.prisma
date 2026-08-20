@@ -142,6 +142,33 @@ model CalendarFeed {
   updatedAt DateTime @updatedAt
 }
 
+/// Een agenda-account dat we zelf uitlezen in plaats van een publieke feed.
+/// Nodig omdat een gedeelde iCloud-agenda niet te publiceren is door iemand die
+/// hem niet zelf heeft aangemaakt: via CalDAV gebruiken we gewoon de toegang die
+/// Merel al heeft.
+model CalendarAccount {
+  id       String @id @default(cuid())
+  provider String @default("ICLOUD")
+  /// Apple ID (e-mailadres)
+  username String
+  /// App-specifiek wachtwoord, versleuteld met AUTH_SECRET. Nooit teruggeven in een API-antwoord.
+  secret   String
+  folder   String @default("PRIVE")
+  color    String @default("#6d28d9")
+  enabled  Boolean @default(true)
+
+  /// Welke agenda's van dit account meedoen: komma-gescheiden CalDAV-URL's.
+  /// Leeg betekent: alle agenda's die we vinden.
+  selected String?
+
+  lastSyncAt DateTime?
+  /// Laatste fout, zodat een kapotte koppeling zichtbaar is in plaats van stil.
+  lastError  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Contact {
   id      String  @id @default(cuid())
   name    String

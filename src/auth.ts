@@ -1,12 +1,12 @@
 import NextAuth, { type NextAuthConfig } from "next-auth";
-import Apple from "next-auth/providers/apple";
 import GitHub from "next-auth/providers/github";
-import Google from "next-auth/providers/google";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
 /**
+ * De inlogproviders.
+ *
  * GitHub krijgt expliciet een `issuer` mee.
  *
  * GitHub is RFC 9207 gaan gebruiken en stuurt sindsdien een `iss`-parameter mee
@@ -18,14 +18,22 @@ import { prisma } from "@/lib/prisma";
  *
  * Upstream staat deze regel nu ook in de provider zelf, dus bij een latere
  * next-auth-upgrade is dit niet fout maar dubbel.
+ *
+ * Apple en Google stonden hier ook, maar zonder secrets in Vercel liep elke klik
+ * op die knoppen op dezelfde foutpagina uit. Apple is bovendien niet gratis: dat
+ * vraagt een Developer Program-lidmaatschap (€99/jaar) en geeft geen toegang tot
+ * de iCloud-agenda — inloggen met Apple levert alleen naam en e-mail. Zet ze pas
+ * terug samen met de bijbehorende secrets.
  */
 const providers: NextAuthConfig["providers"] = [
-  Apple,
   GitHub({ issuer: "https://github.com/login/oauth" }),
-  Google,
 ];
 
-// Only include Microsoft provider if credentials are set
+/** Microsoft doet alleen mee als de secrets er zijn; anders faalt de knop. */
+export const microsoftEnabled = Boolean(
+  process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+);
+
 if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
   providers.push(
     MicrosoftEntraID({

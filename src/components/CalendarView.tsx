@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MAIN_FOLDERS } from "@/lib/folders";
+import ICloudCalendars from "@/components/ICloudCalendars";
 
 interface CalendarFeed {
   id: string;
@@ -33,7 +34,10 @@ export default function CalendarView() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [microsoftConnected, setMicrosoftConnected] = useState(false);
+  const [microsoftAvailable, setMicrosoftAvailable] = useState(false);
   const [microsoftLoading, setMicrosoftLoading] = useState(false);
+  /** Mappen waar een gekoppeld iCloud-account afspraken in zet. */
+  const [accountFolders, setAccountFolders] = useState<string[]>([]);
 
   // Add feed form
   const [newName, setNewName] = useState("");
@@ -45,11 +49,22 @@ export default function CalendarView() {
     try {
       const res = await fetch("/api/calendar-feeds", { cache: "no-store" });
       setFeeds(await res.json());
+
+      // Gekoppelde accounts (iCloud) leveren ook afspraken, in hun eigen map
+      const accRes = await fetch("/api/calendar-accounts", { cache: "no-store" });
+      if (accRes.ok) {
+        const accounts: { folder: string; enabled: boolean }[] = await accRes.json();
+        setAccountFolders([
+          ...new Set(accounts.filter((a) => a.enabled).map((a) => a.folder)),
+        ]);
+      }
+
       // Check Microsoft connection status
       const msRes = await fetch("/api/microsoft/status", { cache: "no-store" });
       if (msRes.ok) {
         const msData = await msRes.json();
         setMicrosoftConnected(msData.connected);
+        setMicrosoftAvailable(msData.available !== false);
       }
     } finally {
       setLoading(false);
@@ -63,7 +78,9 @@ export default function CalendarView() {
       const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const to = new Date(from.getTime() + 14 * 24 * 60 * 60 * 1000); // 2 weeks
 
-      const folders = [...new Set(feeds.filter((f) => f.enabled).map((f) => f.folder))];
+      const folders = [
+        ...new Set([...feeds.filter((f) => f.enabled).map((f) => f.folder), ...accountFolders]),
+      ];
       const allEvents: CalendarEvent[] = [];
 
       // Fetch ICS feed events
@@ -97,17 +114,17 @@ export default function CalendarView() {
     } finally {
       setEventsLoading(false);
     }
-  }, [feeds, microsoftConnected]);
+  }, [feeds, accountFolders, microsoftConnected]);
 
   useEffect(() => {
     fetchFeeds();
   }, [fetchFeeds]);
 
   useEffect(() => {
-    if (feeds.length > 0 || microsoftConnected) {
+    if (feeds.length > 0 || accountFolders.length > 0 || microsoftConnected) {
       fetchEvents();
     }
-  }, [feeds, microsoftConnected, fetchEvents]);
+  }, [feeds, accountFolders, microsoftConnected, fetchEvents]);
 
   async function addFeed(e: React.FormEvent) {
     e.preventDefault();
@@ -162,12 +179,14 @@ export default function CalendarView() {
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Agenda</h1>
-        <p className="text-gray-500 mt-1">
-          Je agenda-events uit Microsoft Calendar en Apple Calendar
-        </p>
+        <p className="text-gray-500 mt-1">Je afspraken uit iCloud en losse agenda-feeds</p>
       </div>
 
-      {/* Microsoft connection */}
+      {/* iCloud via CalDAV: werkt ook voor agenda's die met je gedeeld zijn */}
+      <ICloudCalendars onChange={fetchFeeds} />
+
+      {/* Microsoft connection — alleen als de provider echt geregistreerd is */}
+      {microsoftAvailable && (
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-4">
         <div className="flex items-center gap-3">
           <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 23 23">
@@ -204,11 +223,12 @@ export default function CalendarView() {
           )}
         </div>
       </div>
+      )}
 
       {/* Feed management */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">Gekoppelde agenda&apos;s</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Losse agenda-feeds</h3>
           <button
             onClick={() => setShowAddFeed(!showAddFeed)}
             className="text-xs font-medium text-violet-600 hover:text-violet-700"
@@ -346,7 +366,7 @@ export default function CalendarView() {
           <div className="w-8 h-8 border-4 border-violet-600 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : Object.keys(eventsByDay).length === 0 ? (
-        feeds.length > 0 ? (
+        feeds.length > 0 || accountFolders.length > 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-400">Geen events komende 2 weken</p>
           </div>

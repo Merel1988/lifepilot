@@ -3,12 +3,45 @@
     "allow": [
       "Bash(npx next:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp status)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp diff --stat)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp log --oneline -5)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp diff src/components/HabitTracker.tsx)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp add src/components/HabitTracker.tsx)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp commit -m ':*)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp push)",
+      "Bash(npm install:*)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp add package.json package-lock.json prisma/schema.prisma src/app/api/items/route.ts src/app/globals.css src/components/CreateItemModal.tsx src/components/EditItemModal.tsx src/components/ItemCard.tsx src/lib/types.ts src/app/api/attachments/ src/components/RichTextEditor.tsx)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" \"https://www.ah.nl/zoeken/api/products/search?query=bonus&size=10\" -H \"User-Agent: Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{redirect_url}\" \"https://api.ah.nl/mobile-services/product/search/v2?query=bonus&size=10\" -H \"User-Agent: Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://api.ah.nl/mobile-services/bonuspage/v1/bonus-pages\" -H \"User-Agent: Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36\")",
+      "WebSearch",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s -X POST \"https://api.ah.nl/mobile-auth/v1/auth/token/anonymous\" -H \"Content-Type: application/json\" -H \"User-Agent: Appie/8.22.3\" -d '{\"clientId\":\"appie\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c ':*)",
+      "Bash(ls /Users/MerelStaal/Sites/todoapp/public/icon-* /Users/MerelStaal/Sites/todoapp/public/favicon*)",
+      "Bash(convert /Users/MerelStaal/Sites/todoapp/public/logo.svg -resize 192x192 /Users/MerelStaal/Sites/todoapp/public/icon-192.png)",
+      "Bash(convert /Users/MerelStaal/Sites/todoapp/public/logo.svg -resize 512x512 /Users/MerelStaal/Sites/todoapp/public/icon-512.png)",
+      "Bash(convert /Users/MerelStaal/Sites/todoapp/public/logo.svg -resize 32x32 /Users/MerelStaal/Sites/todoapp/public/favicon.ico)",
+      "Bash(ls -la /Users/MerelStaal/Sites/todoapp/public/icon-*.png /Users/MerelStaal/Sites/todoapp/public/favicon.ico)",
+      "Bash(git -C /Users/MerelStaal/Sites/todoapp add src/app/api/ah-bonus/route.ts src/app/api/pantry/route.ts prisma/schema.prisma src/components/MealPlanner.tsx src/app/layout.tsx public/logo.svg public/icon-192.png public/icon-512.png public/favicon.ico)",
+      "Bash(convert public/logo.svg -resize 192x192 public/icon-192.png)",
+      "Bash(convert public/logo.svg -resize 512x512 public/icon-512.png)",
+      "Bash(convert public/logo.svg -resize 32x32 public/favicon.ico)",
+      "Bash(magick public/logo.svg -resize 192x192 public/icon-192.png)",
+      "Bash(magick public/logo.svg -resize 512x512 public/icon-512.png)",
+      "Bash(magick public/logo.svg -resize 32x32 public/favicon.ico)",
+      "Bash(git push:*)",
+      "Bash(find src/components src/app -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -not -path \"*/generated/*\" -exec sed -i '' -E 's/\\(bg|text|border|ring|shadow|hover:bg|hover:text|hover:border|focus:ring\\)-blue-/\\\\1-violet-/g' {} \\\\;)"
     ],
     "additionalDirectories": [
       "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar",
       "/Users/MerelStaal/Sites/todoapp/src/app/api/recipes",
-      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar-feeds"
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/calendar-feeds",
+      "/Users/MerelStaal/Sites/todoapp/src/app/api/attachments"
     ]
   }
 }
