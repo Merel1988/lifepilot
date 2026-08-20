@@ -2,30 +2,29 @@
 
 Bijwerken aan het eind van elke sessie. Lees dit samen met `CLAUDE.md` voordat je begint.
 
-**Laatst bijgewerkt:** 20 augustus 2026 (v9 — flexibel weekmenu + mealprep)
-**Fase:** bouwen. Ochtendkaart, contacten, dump-invoer, de vier ingangen en het flexibele weekmenu staan er. De agenda is het openstaande besluit: Merel kan geen van haar twee agenda's delen (zie hieronder).
+**Laatst bijgewerkt:** 20 augustus 2026 (v10 — iCloud-agenda via CalDAV)
+**Fase:** bouwen. Ochtendkaart, contacten, dump-invoer, de vier ingangen, het flexibele weekmenu en de iCloud-koppeling staan er. Wat nu ontbreekt is één handeling van Merel: het app-specifieke wachtwoord aanmaken en de agenda koppelen. Dan is de tijdlijn eindelijk gevuld.
 
 ## ⚠️ Eerst dit — het wacht op Merel
 
 De app werkt, maar een paar dingen kan alleen jij doen:
 
 1. **Controleer of inloggen weer werkt.** Op 20 aug lag het plat (zie "Storing 20 augustus" hieronder); de fix staat live sinds 11:39. Als je nog steeds een foutpagina krijgt: de logs zijn op te vragen met `vercel logs https://www.lifepilot.nl --json`.
-2. **Beslis over Apple en Google.** De loginpagina toont drie knoppen, maar in Vercel staan alleen de `AUTH_GITHUB_*`-variabelen. Apple en Google kunnen dus niet werken; die knoppen leiden naar dezelfde foutpagina. Kies: secrets toevoegen in Vercel, of die twee knoppen weghalen. Niet laten staan — een knop die altijd faalt kost vertrouwen in de hele app.
-3. **Besluit over de agenda.** Op 20 aug bleek de aanname uit v7 fout: Merel kan haar privé-agenda niet publiceren (het is een gedeelde agenda die haar man heeft aangemaakt; alleen de eigenaar kan publiceren) en haar werkagenda vermoedelijk ook niet. De openbare `webcal://`-route valt daarmee weg. Zie "De agenda: wat kan nog" hieronder.
+2. ~~Beslis over Apple en Google.~~ Gedaan op 20 aug: beide knoppen zijn weg. GitHub is de enige inlogmanier. Apple kostte €99/jaar en gaf geen agenda-toegang; Google had geen secrets in Vercel.
+3. **Koppel de iCloud-agenda** op `/agenda`. Twee stappen: (1) op account.apple.com → Aanmelden en beveiliging → App-specifieke wachtwoorden → maak er een aan met de naam "LifePilot"; (2) op `/agenda` je Apple ID en die code invullen. De app zoekt dan zelf op welke agenda's je hebt — inclusief de gedeelde gezinsagenda — en je vinkt aan welke meedoen. Dit is het laatste dat de tijdlijn nog nodig heeft.
 4. **Een paar contacten invoeren** op `/contacten`. Zonder rijen blijven "Verjaardagen" en "Even laten weten" weg.
 
 De contacttabel staat in Turso (19 aug gedraaid en nagekeken: tabel, index en alle dertien kolommen kloppen met het model). Daar hoef je niets meer aan te doen.
 
-## De agenda: wat kan nog
+## De agenda: hoe het nu werkt
 
-De tijdlijn met afspraken én taken door elkaar is volgens de visie het enige dat geen andere app voor Merel doet. Die staat of valt bij één werkende feed, en de route die daarvoor was bedacht (openbare `webcal://`-link) blijkt niet te kunnen. Wat er nog over is, van goedkoop naar duur:
+De aanname uit v7 was fout. Een openbare `webcal://`-link kan alleen de eigenaar van een agenda maken, en de privé-agenda is een gedeelde agenda die Merels man heeft aangemaakt. Haar werkagenda kan ze vermoedelijk ook niet delen. De publicatieroute valt dus weg voor precies de twee agenda's waar het om gaat.
 
-1. **Haar man publiceert de gedeelde privé-agenda.** Hij is de eigenaar, dus bij hem staat de knop er wél (Agenda op de Mac of iCloud.com → agenda delen → Openbare agenda). Levert een `webcal://`-link die de bestaande ICS-parser meteen aankan. Kost één verzoek en nul code.
-2. **CalDAV met een app-specifiek wachtwoord.** LifePilot praat dan als agenda-app met `caldav.icloud.com` en leest álle agenda's waar Merel bij kan, gedeelde agenda's inbegrepen — zonder dat er iets gedeeld hoeft te worden. Het wachtwoord maakt ze zelf aan op account.apple.com, gratis, werkt met tweestapsverificatie. Kost wél code: discovery (PROPFIND) en een `calendar-query` REPORT, plus het wachtwoord veilig opslaan.
-3. **Werkagenda via Microsoft Graph.** De code staat er nog (nu dode code) en OAuth-toestemming geeft ze zelf; het risico is dat de tenant beheerderstoestemming eist. Eerst goedkoop te testen: staat "agenda publiceren" aan in Outlook web (Instellingen → Agenda → Gedeelde agenda's)?
-4. **Agenda eruit.** Dan wordt Vandaag een takenlijst met een nu-streep, en verliest de app het onderscheidende deel van de visie. Dat is een productbesluit, geen opruimactie — pas doen als 1 t/m 3 allemaal afvallen.
+**De gekozen oplossing: CalDAV met een app-specifiek wachtwoord.** De app praat met `caldav.icloud.com` zoals Agenda op de Mac dat doet, met Merels eigen Apple ID. Daarmee is alles leesbaar waar zij bij kan — een agenda die iemand anders met haar deelt hoeft niet gepubliceerd te worden, want ze heeft de toegang al. Alleen lezen; er wordt nooit iets naar de agenda geschreven.
 
-**Wat níet kan:** inloggen met Apple geeft geen agenda-toegang. "Sign in with Apple" levert alleen naam en e-mail; Apple heeft geen agenda-API achter OAuth. Bovendien kost Apple als inlogprovider een Developer Program-lidmaatschap van €99 per jaar. De Apple-knop op de loginpagina kan dus weg, tenzij Merel dat lidmaatschap om een andere reden wil.
+**Wat níet kan, voor de volgende keer dat de vraag opkomt:** inloggen met Apple geeft géén agenda-toegang. "Sign in with Apple" levert alleen naam en e-mail; er zit geen agenda-API achter Apple's OAuth. Het kost bovendien €99/jaar (Developer Program). Dat is waarom de Apple-knop weg is en het app-specifieke wachtwoord de route werd.
+
+**De werkagenda staat hier los van.** Een app-specifiek wachtwoord helpt daar niet; dat blijft Outlook publiceren of Microsoft Graph. Nog goedkoop te proberen: staat "agenda publiceren" aan in Outlook web (Instellingen → Agenda → Gedeelde agenda's)? De Graph-code staat er nog, dus **niet opruimen** zolang dit niet beproefd is.
 
 ## Aanleiding
 
@@ -36,7 +35,7 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 ## De visie in vijf regels
 
 1. De app wordt gebouwd rond **drie momenten**: de ochtendkaart (07:00, 30 sec) ✅, de dump (onderweg, 2 tikken) ✅, het weekmenu (zondag, 15 min) ✅.
-2. Belangrijkste UI-idee: **agenda-afspraken en taken door elkaar op één tijdlijn** op het Vandaag-scherm ✅. Dat is het enige dat geen andere app voor haar doet — maar het staat of valt bij een gekoppelde agenda (zie boven).
+2. Belangrijkste UI-idee: **agenda-afspraken en taken door elkaar op één tijdlijn** op het Vandaag-scherm ✅. Dat is het enige dat geen andere app voor haar doet — de koppeling is nu mogelijk (iCloud via CalDAV), maar nog niet gelegd.
 3. Menu van tien ingangen naar **vier**: Vandaag, Lijst, Eten, Zoeken ✅.
 4. Invoeren wordt **één tekstveld met natuurlijke taal** ✅.
 5. Meetlat over vier weken: **tikt ze de ochtendmelding aan?** Zo nee, dan is de aanname fout en gaan we niet doorbouwen. Dat is de enige echte test; al het bovenstaande is tot dan een aanname.
@@ -81,6 +80,14 @@ De volledige visie staat in de artifact `Waarvoor is LifePilot er?` (privé gepu
 - Het raster, de gewoontes en de mealprep-getallen worden bij het plan bewaard (sleutel `instellingen` in de JSON, geen schemawijziging) en via `GET /api/meal-plan/settings` teruggezet. Volgende week begint dus waar deze week eindigde.
 - `npm run check:mealplan` — 11 regressiegevallen op de promptopbouw in `scripts/check-mealplan.ts`. De maaltijdplanner zit achter de login en is niet met een browser te controleren; dit is de enige manier om te zien dat de server het raster volgt. De check ving meteen twee echte fouten: `0` gerechten werd stil `3` (falsy `||`), en de dagvoorkeuren noemden dagen die niet gepland waren.
 
+**De agenda** (`/agenda`)
+- `src/lib/caldav.ts` is een eigen mini-CalDAV-client: discovery (`current-user-principal` → `calendar-home-set` → de agenda's) en daarna een `calendar-query` REPORT per agenda. Redirects worden zelf gevolgd, want `fetch` mag bij een 301 de methode naar GET veranderen en dan komt er geen multistatus terug. iCloud verhuist je onderweg naar een andere host (`p42-caldav.icloud.com`), dus elke href wordt tegen de URL van het *antwoord* opgelost.
+- `<C:expand>` laat de server herhalende afspraken uitschrijven naar losse instanties, in UTC. Dat scheelt een RRULE-implementatie (`ics-parser.ts` kan dat niet) én het omzeilt de tijdzone-gok die `parseICSDate` bij een `TZID` wel maakt. Kan een server dat niet, dan is er een terugval zonder expand.
+- Taken- en notitielijsten staan bij iCloud in dezelfde map als de agenda's; alleen collecties die VEVENT ondersteunen komen door.
+- Het app-specifieke wachtwoord staat versleuteld in `CalendarAccount.secret` (AES-256-GCM, sleutel afgeleid uit `AUTH_SECRET`, zie `src/lib/secret-box.ts`) en komt nooit terug in een API-antwoord. **Let op:** verander je `AUTH_SECRET`, dan moet de koppeling opnieuw gelegd worden.
+- `src/lib/calendar.ts` haalt nu feeds én accounts op en houdt CalDAV-antwoorden vijf minuten per serverinstantie vast; zonder die cache kost elke render van de ochtendkaart een discovery plus een verzoek per agenda. `lastSyncAt` wordt niet bij elke render geschreven, alleen als er iets te melden valt.
+- `npm run check:caldav` — de XML-verwerking op de vormen die iCloud teruggeeft (wisselende namespace-prefixen, self-closing elementen, escaped iCalendar-data) plus de héle keten tegen een lokale nep-server: redirect, Depth-headers, de expand-parameters en de foutmelding bij een verkeerd wachtwoord. Die check ving een echte bug: iCloud zet de regeleindes van de iCalendar-data als `&#13;` in het antwoord, en zonder numerieke entiteiten te decoderen zag de parser `BEGIN:VEVENT&#13;` niet meer als het begin van een afspraak.
+
 **Navigatie: vier ingangen**
 - `src/components/MainNav.tsx`: Vandaag (`/`), Lijst (`/lijst`), Eten (`/maaltijdplanner`), Zoeken (`/zoeken`). Op mobiel een tabbalk onderaan bij je duim, op desktop een smalle rail links. Eén badge, op Vandaag: het aantal open dingen van vandaag.
 - De pagina's die uit het menu gingen zijn niet verwijderd maar staan in een "Meer"-la: contacten, agenda, gewoontes, recepten en de losse lijsten per type. Zonder die la waren ze alleen nog via de URL te vinden — en `/agenda` heb je juist nodig. De tien tijd-subitems zijn weg; `?tijd=` werkt nog als filter.
@@ -113,10 +120,10 @@ Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches 
 | Wat | Waar | Status |
 | --- | --- | --- |
 | Het weekmenu is nog niet één keer echt gegenereerd sinds de wijziging: dat kost een API-aanroep met een echte sleutel en het schrijft een rij in Turso. De promptopbouw is met 11 gevallen nagelopen, het antwoord van het model niet. | `npm run check:mealplan`, `/maaltijdplanner` | Open — Merel proberen |
-| De agenda heeft geen werkende feed en de bedachte route kan niet. | zie "De agenda: wat kan nog" | Open — beslissing aan Merel |
-| Apple en Google staan als provider in de code, maar hun secrets staan niet in Vercel. Die twee knoppen op de loginpagina falen dus altijd. Voor Apple komt daar bij dat het €99/jaar kost en geen agenda-toegang oplevert. | `src/auth.ts`, `src/app/login/page.tsx`, Vercel env | Open — beslissing aan Merel |
+| De iCloud-koppeling is nog nooit tegen de echte iCloud gedraaid: dat kan alleen met Merels Apple ID. De keten is wel end-to-end getest tegen een nep-server. Loopt het mis, dan staat de echte fout in `vercel logs` (de client logt met "iCloud koppelen mislukt" / "Agenda's ophalen mislukt") en de laatste fout staat ook op `/agenda` bij het account. | `npm run check:caldav`, `/agenda` | Open — Merel koppelen |
+| Of "gedeeld" bij een agenda klopt, is niet met een echt account nagekeken: dat leidt de app af uit het accountnummer in het `owner`-pad. Het label is cosmetisch — een verkeerde gok verbergt geen agenda. | `src/lib/caldav.ts` (`isShared`) | Later |
 | Stille foutafhandeling (`catch {}`) op meerdere plekken: mislukkingen zijn onzichtbaar. | o.a. `api/calendar/[folder]`, `ReminderChecker`, `api/ah-bonus` | Open |
-| Microsoft-integratie is dode code: `MICROSOFT_CLIENT_ID` staat niet in `.env`, dus de provider wordt nooit geregistreerd en de statusroute zegt altijd "niet verbonden". Nu de werkagenda afvalt, kan dit weg. | `src/auth.ts`, `src/app/api/microsoft/status/route.ts`, `src/lib/microsoft-graph.ts` | Open — opruimen |
+| Microsoft-integratie is dode code: `MICROSOFT_CLIENT_ID` staat niet in `.env`, dus de provider wordt nooit geregistreerd. De knoppen zijn inmiddels wel verstopt (`microsoftEnabled` in `src/auth.ts`, `available` in de statusroute), dus je ziet niets kapots meer. Weghalen kan pas als de werkagenda definitief afvalt. | `src/auth.ts`, `src/app/api/microsoft/status/route.ts`, `src/lib/microsoft-graph.ts` | Wacht op de werkagenda |
 | Verversen via het zelfverzonnen window-event `item-moved`; niets controleert of alle plekken meedoen. | `MainNav`, `FolderView`, `ItemListView`, `QuickAdd` | Later |
 | Geen tests op de tijdindeling (randgevallen: achterstallig, herhalend, jaargrens). De dump-parser heeft er 29, de weekmenu-invoer 11. | `scripts/check-parse.ts` als voorbeeld | Later |
 | Bijlagen als `Bytes` in Turso (tot 10 MB per bestand). | `prisma/schema.prisma`, `api/attachments` | Later |
@@ -140,7 +147,7 @@ Opgelost sinds de codereview: de meldingen die nooit afgingen, de zeven fetches 
 
 ## Volgorde voor het vervolg
 
-1. **Agenda beslissen** — de vier opties hierboven. Dit is nu het grootste ding, want de tijdlijn is het onderscheidende deel van de visie en die staat leeg.
+1. **Agenda koppelen** (Merel, zie bovenaan). Zonder die ene handeling blijft de tijdlijn leeg en is het onderscheidende deel van de visie niet te beoordelen.
 2. **Dumpen vanaf elk scherm** — de "+" in de tabbalk, zodat het dumpveld niet aan de lijstpagina's hangt.
 3. Foutmeldingen en bevestigingen overal zichtbaar maken; de `catch {}`-plekken opruimen.
 4. Dode Microsoft-code verwijderen — **wacht hiermee** tot de agenda beslist is: bij optie 3 is dit juist de code die je nodig hebt.
@@ -149,6 +156,7 @@ Daarna niets meer bouwen tot de meetlat uit de visie een antwoord heeft: tikt ze
 
 ## Sessielog
 
+- **20 aug 2026 (v10)** — Agenda opgelost langs een andere route dan gepland: eigen CalDAV-client voor iCloud met een app-specifiek wachtwoord, omdat een gedeelde agenda niet te publiceren is door wie hem niet heeft aangemaakt. Wachtwoord versleuteld in de database, koppelscherm op `/agenda` met per-agenda vinkjes, `CalendarAccount`-tabel in Turso gezet en nagekeken, en `npm run check:caldav` met de XML-vormen van iCloud plus de hele keten tegen een lokale nep-server. Apple en Google als inlogknop verwijderd (Apple: €99/jaar en geen agenda-API), Microsoft-knoppen achter een vlag.
 - **20 aug 2026 (v9)** — Weekmenu flexibel gemaakt: promptopbouw naar `src/lib/meal-plan-input.ts`, restjes en frietjes als verplaatsbare gewoontes, mealprep-modus met porties en bewaaradvies, `max_tokens` omhoog, eigen foutmelding per faalpad, instellingen die vorige week onthouden, plus `npm run check:mealplan` met 11 gevallen. Daarna bleek uit een vraag van Merel dat de agenda-aanname niet klopt: geen van haar twee agenda's kan ze zelf delen. De agenda-opties staan nu bovenaan als besluit, en het antwoord op "kan inloggen met Apple de agenda lezen" is nee.
 - **20 aug 2026 (v8)** — Inloggen lag plat. Oorzaak uit de productielogs gehaald (GitHub + RFC 9207 versus de placeholder-issuer in `@auth/core`), fix van één regel in `src/auth.ts` nagemeten en uitgerold. Onderweg gezien dat Apple en Google geen secrets hebben in Vercel. Vercel CLI aan het project gekoppeld.
 - **19 aug 2026 (v7)** — Handover herschreven: drie losse "Gebouwd op 19 augustus"-secties samengevoegd tot één "Wat er nu staat", opgeloste bevindingen uit de tabel gehaald, het werk voor Merel bovenaan gezet en de volgorde opnieuw genummerd. Geen codewijzigingen.
